@@ -1,0 +1,96 @@
+:root,
+[data-theme='claro'] {
+  --bg: #f6f4f0;
+  --bg-2: #ece9e2;
+  --surface: #ffffff;
+  --surface-2: #f8f7f5;
+  --border: #e8e5df;
+  --border-subtle: #f0ede8;
+  --text: #131418;
+  --text-2: #4a4d5a;
+  --muted: #7b8092;
+
+  /* Acento y secundarios armónicos (familia coral/peach) */
+  --primary: #ff5c7a;
+  --primary-hover: #e84a68;
+  --primary-soft: rgba(255, 92, 122, 0.12);
+  --accent-peach: #ff8e72;
+  --accent-amber: #f5a65b;
+  --accent-rose: #fda4af;
+
+  /* Semánticos */
+  --success: #10b981;
+  --warning: #f5a65b;
+  --danger: #f43f5e;
+  --info: #3b82f6;
+
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.08);
+  --radius: 18px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  /* Sidebar (siempre oscuro) */
+  --sidebar-bg: #0e1017;
+  --sidebar-border: #262a3b;
+  --sidebar-text: #f4f5f8;
+  --sidebar-muted: #8a8f9f;
+}
+
+[data-theme='oscuro'] {
+  --bg: #0e1017;
+  --bg-2: #141722;
+  --surface: #181b26;
+  --surface-2: #212534;
+  --border: #262a3b;
+  --border-subtle: #1f2230;
+  --text: #f4f5f8;
+  --text-2: #c6c9d8;
+  --muted: #8a8f9f;
+
+  --primary: #ff6b8b;
+  --primary-hover: #ff5277;
+  --primary-soft: rgba(255, 107, 139, 0.18);
+  --accent-peach: #ffa089;
+  --accent-amber: #fbbf24;
+  --accent-rose: #f472b6;
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --info: #60a5fa;
+
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 44px rgba(0, 0, 0, 0.5);
+
+  --sidebar-bg: #0a0c12;
+  --sidebar-border: #1f2230;
+  --sidebar-text: #f4f5f8;
+  --sidebar-muted: #8a8f9f;
+}
+
+/* status colors */
+.st-Pendiente { color: #f59e0b; }
+.st-EnProceso { color: #3b82f6; }
+.st-Enviado { color: #7c3aed; }
+.st-Entregado { color: #10b981; }
+.st-Cancelado { color: #f43f5e; }
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.2s, color 0.2s;
+}
+
+button { font-family: inherit; }
+input, select, textarea { font-family: inherit; }
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
