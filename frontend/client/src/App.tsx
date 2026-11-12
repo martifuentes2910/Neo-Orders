@@ -1,16 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { lazy, Suspense } from 'react';
 import AppLayout from './layouts/AppLayout';
-import Login from './pages/Login';
-import Panel from './pages/Panel';
-import Pedidos from './pages/Pedidos';
-import Clientes from './pages/Clientes';
-import Productos from './pages/Productos';
-import Vendedores from './pages/Vendedores';
-import Reportes from './pages/Reportes';
-import Configuracion from './pages/Configuracion';
+const Login = lazy(() => import('./pages/Login'));
+const Panel = lazy(() => import('./pages/Panel'));
+const Pedidos = lazy(() => import('./pages/Pedidos'));
+const Clientes = lazy(() => import('./pages/Clientes'));
+const Productos = lazy(() => import('./pages/Productos'));
+const Vendedores = lazy(() => import('./pages/Vendedores'));
+const Reportes = lazy(() => import('./pages/Reportes'));
+const Configuracion = lazy(() => import('./pages/Configuracion'));
 import './index.css';
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -32,6 +34,8 @@ export default function App() {
       <AuthProvider>
         <ThemeProvider initialMode={(localStorage.getItem('neoorders.theme') as any) || 'claro'}>
           <SettingsProvider>
+            <Toaster richColors position="bottom-right" />
+            <Suspense fallback={<div className="flex h-screen items-center justify-center text-muted-foreground">Cargando…</div>}>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route
@@ -59,6 +63,7 @@ export default function App() {
               </Route>
               <Route path="*" element={<Navigate to="/panel" replace />} />
             </Routes>
+            </Suspense>
           </SettingsProvider>
         </ThemeProvider>
       </AuthProvider>

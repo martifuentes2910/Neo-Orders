@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { useChartTheme } from '../hooks/useChartTheme';
 import { api } from '../api';
-import { ORDER_STATUSES, STATUS_COLORS } from '../types';
+import { ORDER_STATUSES, getStatusColor } from '../types';
+import { useTheme } from '../context/ThemeContext';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 function today() { return new Date().toISOString().slice(0, 10); }
@@ -10,6 +19,9 @@ function yearStart() { return `${new Date().getFullYear()}-01-01`; }
 
 export default function Reportes() {
   const { formatMoney } = useSettings();
+  const chartTheme = useChartTheme();
+  const { resolved } = useTheme();
+  const isDark = resolved === 'oscuro';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<any[]>([]);
@@ -48,11 +60,7 @@ export default function Reportes() {
     }
   };
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [desde, hasta, clientId, sellerId, estado]);
-
+  useEffect(() => { load(); }, [desde, hasta, clientId, sellerId, estado]);
   useEffect(() => {
     api.clients.list().then(setClients).catch(() => {});
     api.sellers.list(true).then(setSellers).catch(() => {});
@@ -67,156 +75,174 @@ export default function Reportes() {
     setEstado('Todos');
   };
 
-  if (loading && !data) return <div className="loading">Cargando reportes…</div>;
+  if (loading && !data) return <div className="flex items-center justify-center py-20 text-muted-foreground">Cargando reportes…</div>;
 
   const pieData = (data?.porEstado || []).map((e: any) => ({
-    name: e.estado,
-    value: e.cantidad,
-    color: STATUS_COLORS[e.estado as keyof typeof STATUS_COLORS] || '#6b7280',
+    name: e.estado, value: e.cantidad, color: getStatusColor(e.estado as any, isDark) || '#6b7280',
   }));
-
-  const barMes = (data?.porMes || []).map((m: any) => ({
-    name: `${m.month}/${String(m.year).slice(2)}`,
-    ingresos: m.ingresos,
-  }));
-
-  const topProd = (data?.topProductos || []).map((p: any) => ({
-    name: p.producto,
-    ingresos: p.ingresos,
-  }));
-
-  const topCli = (data?.topClientes || []).map((c: any) => ({
-    name: c.cliente,
-    total: c.total,
-  }));
-
-  const ventasVend = (data?.ventasPorVendedor || []).map((v: any) => ({
-    name: v.vendedor,
-    total: v.total,
-  }));
+  const barMes = (data?.porMes || []).map((m: any) => ({ name: `${m.month}/${String(m.year).slice(2)}`, ingresos: m.ingresos }));
+  const topProd = (data?.topProductos || []).map((p: any) => ({ name: p.producto, ingresos: p.ingresos }));
+  const topCli = (data?.topClientes || []).map((c: any) => ({ name: c.cliente, total: c.total }));
+  const ventasVend = (data?.ventasPorVendedor || []).map((v: any) => ({ name: v.vendedor, total: v.total }));
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <h1>Reportes</h1>
-        <p className="page-sub">Análisis y gráficos del negocio.</p>
-      </div>
+    <div className="space-y-6">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <h1 className="text-2xl font-bold tracking-tight">Reportes</h1>
+        <p className="text-sm text-muted-foreground">Análisis y gráficos del negocio.</p>
+      </motion.div>
 
-      <div className="card filter-bar">
-        <div className="filter-group">
-          <label>Período</label>
-          <select value={period} onChange={(e) => applyPreset(e.target.value)}>
-            <option value="30">Últimos 30 días</option>
-            <option value="90">Últimos 90 días</option>
-            <option value="year">Este año</option>
-            <option value="all">Todo el historial</option>
-            <option value="custom">Personalizado</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <label>Desde</label>
-          <input type="date" value={desde} onChange={(e) => { setDesde(e.target.value); setPeriod('custom'); }} />
-        </div>
-        <div className="filter-group">
-          <label>Hasta</label>
-          <input type="date" value={hasta} onChange={(e) => { setHasta(e.target.value); setPeriod('custom'); }} />
-        </div>
-        <div className="filter-group">
-          <label>Cliente</label>
-          <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-            <option value="">Todos</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-        </div>
-        <div className="filter-group">
-          <label>Vendedor</label>
-          <select value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
-            <option value="">Todos</option>
-            {sellers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
-        <div className="filter-group">
-          <label>Estado</label>
-          <select value={estado} onChange={(e) => setEstado(e.target.value)}>
-            <option value="Todos">Todos</option>
-            {ORDER_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <button className="btn btn-ghost btn-sm" onClick={clear}>Limpiar</button>
-      </div>
-
-      <div className="charts-grid">
-        <div className="card">
-          <h3>Pedidos por estado</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                {pieData.map((d: any, i: number) => <Cell key={i} fill={d.color} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="legend">
-            {pieData.map((d: any) => (
-              <span key={d.name} className="legend-item">
-                <span className="dot" style={{ background: d.color }} />
-                {d.name} ({d.value})
-              </span>
-            ))}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Período</Label>
+              <Select value={period} onValueChange={applyPreset}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">Últimos 30 días</SelectItem>
+                  <SelectItem value="90">Últimos 90 días</SelectItem>
+                  <SelectItem value="year">Este año</SelectItem>
+                  <SelectItem value="all">Todo el historial</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Desde</Label>
+              <Input type="date" value={desde} onChange={(e) => { setDesde(e.target.value); setPeriod('custom'); }} className="w-36" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Hasta</Label>
+              <Input type="date" value={hasta} onChange={(e) => { setHasta(e.target.value); setPeriod('custom'); }} className="w-36" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Cliente</Label>
+              <Select value={clientId || 'all'} onValueChange={(v) => setClientId(v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {clients.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Vendedor</Label>
+              <Select value={sellerId || 'all'} onValueChange={(v) => setSellerId(v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {sellers.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Estado</Label>
+              <Select value={estado} onValueChange={setEstado}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todos</SelectItem>
+                  {ORDER_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" onClick={clear}>Limpiar</Button>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="card">
-          <h3>Ingresos por mes</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={barMes}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="name" stroke="var(--muted)" fontSize={12} />
-              <YAxis stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v: any) => formatMoney(Number(v))} />
-              <Bar dataKey="ingresos" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Pedidos por estado</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
+                    {pieData.map((d: any, i: number) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: chartTheme.tooltipBg, border: '1px solid ' + chartTheme.tooltipBorder, borderRadius: '8px', color: chartTheme.tooltipText }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                {pieData.map((d: any) => (
+                  <span key={d.name} className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />
+                    {d.name} ({d.value})
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <div className="card">
-          <h3>Productos más vendidos</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={topProd} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis type="number" stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <YAxis type="category" dataKey="name" stroke="var(--muted)" fontSize={11} width={120} />
-              <Tooltip formatter={(v: any) => formatMoney(Number(v))} />
-              <Bar dataKey="ingresos" fill="var(--accent-peach)" radius={[0, 6, 6, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Ingresos por mes</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={barMes}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis dataKey="name" stroke={chartTheme.axis} fontSize={12} />
+                  <YAxis stroke={chartTheme.axis} fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip formatter={(v: any) => formatMoney(Number(v))} contentStyle={{ background: chartTheme.tooltipBg, border: '1px solid ' + chartTheme.tooltipBorder, borderRadius: '8px', color: chartTheme.tooltipText }} />
+                  <Bar dataKey="ingresos" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <div className="card">
-          <h3>Clientes con más compras</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={topCli} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis type="number" stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <YAxis type="category" dataKey="name" stroke="var(--muted)" fontSize={11} width={120} />
-              <Tooltip formatter={(v: any) => formatMoney(Number(v))} />
-              <Bar dataKey="total" fill="var(--accent-amber)" radius={[0, 6, 6, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Productos más vendidos</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={topProd} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis type="number" stroke={chartTheme.axis} fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <YAxis type="category" dataKey="name" stroke={chartTheme.axis} fontSize={11} width={120} />
+                  <Tooltip formatter={(v: any) => formatMoney(Number(v))} contentStyle={{ background: chartTheme.tooltipBg, border: '1px solid ' + chartTheme.tooltipBorder, borderRadius: '8px', color: chartTheme.tooltipText }} />
+                  <Bar dataKey="ingresos" fill="#ff8e72" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <div className="card">
-          <h3>Ventas por vendedor</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={ventasVend} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis type="number" stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <YAxis type="category" dataKey="name" stroke="var(--muted)" fontSize={11} width={120} />
-              <Tooltip formatter={(v: any) => formatMoney(Number(v))} />
-              <Bar dataKey="total" fill="var(--primary)" radius={[0, 6, 6, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Clientes con más compras</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={topCli} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis type="number" stroke={chartTheme.axis} fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <YAxis type="category" dataKey="name" stroke={chartTheme.axis} fontSize={11} width={120} />
+                  <Tooltip formatter={(v: any) => formatMoney(Number(v))} contentStyle={{ background: chartTheme.tooltipBg, border: '1px solid ' + chartTheme.tooltipBorder, borderRadius: '8px', color: chartTheme.tooltipText }} />
+                  <Bar dataKey="total" fill="#f5a65b" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="md:col-span-2">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Ventas por vendedor</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={ventasVend} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis type="number" stroke={chartTheme.axis} fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <YAxis type="category" dataKey="name" stroke={chartTheme.axis} fontSize={11} width={120} />
+                  <Tooltip formatter={(v: any) => formatMoney(Number(v))} contentStyle={{ background: chartTheme.tooltipBg, border: '1px solid ' + chartTheme.tooltipBorder, borderRadius: '8px', color: chartTheme.tooltipText }} />
+                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

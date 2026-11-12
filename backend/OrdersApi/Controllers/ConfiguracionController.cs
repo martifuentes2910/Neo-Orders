@@ -21,7 +21,7 @@ public class ConfiguracionController : ControllerBase
     }
 
     // Company settings (admin)
-    [HttpGet("empresa")]
+    [HttpGet("company")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetEmpresa()
     {
@@ -35,7 +35,7 @@ public class ConfiguracionController : ControllerBase
         return Ok(s);
     }
 
-    [HttpPut("empresa")]
+    [HttpPut("company")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateEmpresa([FromBody] CompanySettings dto)
     {
@@ -49,7 +49,7 @@ public class ConfiguracionController : ControllerBase
     }
 
     // Profile (current user)
-    [HttpGet("perfil")]
+    [HttpGet("profile")]
     public async Task<IActionResult> GetPerfil()
     {
         var user = await _userManager.GetUserAsync(User);
@@ -57,7 +57,7 @@ public class ConfiguracionController : ControllerBase
         return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema });
     }
 
-    [HttpPut("perfil")]
+    [HttpPut("profile")]
     public async Task<IActionResult> UpdatePerfil([FromBody] PerfilDto dto)
     {
         var user = await _userManager.GetUserAsync(User);

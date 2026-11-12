@@ -28,6 +28,7 @@ export function ThemeProvider({ children, initialMode = 'claro' }: { children: R
     const r = resolve(mode);
     setResolved(r);
     document.documentElement.setAttribute('data-theme', r);
+    document.documentElement.classList.toggle('dark', r === 'oscuro');
     localStorage.setItem('neoorders.theme', mode);
     // persist to backend (best effort)
     api.config.perfil.update({ tema: mode }).catch(() => {});
@@ -40,6 +41,7 @@ export function ThemeProvider({ children, initialMode = 'claro' }: { children: R
         const r = mq.matches ? 'oscuro' : 'claro';
         setResolved(r);
         document.documentElement.setAttribute('data-theme', r);
+        document.documentElement.classList.toggle('dark', r === 'oscuro');
       }
     };
     mq.addEventListener('change', handler);

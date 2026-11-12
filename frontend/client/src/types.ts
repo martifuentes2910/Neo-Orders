@@ -9,12 +9,24 @@ export const ORDER_STATUSES: OrderStatus[] = [
 ];
 
 export const STATUS_COLORS: Record<OrderStatus, string> = {
-  Pendiente: '#f59e0b',
-  'En proceso': '#3b82f6',
-  Enviado: '#8b5cf6',
+  Pendiente: '#f5a65b',
+  'En proceso': '#ff5c7a',
+  Enviado: '#ff8e72',
   Entregado: '#10b981',
   Cancelado: '#f43f5e',
 };
+
+export const STATUS_COLORS_DARK: Record<OrderStatus, string> = {
+  Pendiente: '#fbbf24',
+  'En proceso': '#ff6b8b',
+  Enviado: '#ffa089',
+  Entregado: '#34d399',
+  Cancelado: '#fb7185',
+};
+
+export function getStatusColor(status: OrderStatus, isDark: boolean): string {
+  return isDark ? STATUS_COLORS_DARK[status] : STATUS_COLORS[status];
+}
 
 export interface Order {
   id?: number;

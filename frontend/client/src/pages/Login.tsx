@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Login() {
   const { login } = useAuth();
@@ -27,43 +32,52 @@ export default function Login() {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-brand">
-          <svg viewBox="0 0 40 40" width="44" height="44">
-            <defs>
-              <linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#ff5c7a" />
-                <stop offset="50%" stopColor="#ff8e72" />
-                <stop offset="100%" stopColor="#f5a65b" />
-              </linearGradient>
-            </defs>
-            <rect x="2" y="2" width="36" height="36" rx="10" fill="url(#lg2)" />
-            <path d="M12 28 V12 L20 22 L28 12 V28" stroke="#fff" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <div>
-            <h1>NeoOrders</h1>
-            <p>Sistema de gestión de pedidos</p>
-          </div>
-        </div>
-        <form onSubmit={submit} className="login-form">
-          <label>
-            Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
-          <label>
-            Contraseña
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </label>
-          {error && <div className="form-error">{error}</div>}
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Ingresando…' : 'Iniciar sesión'}
-          </button>
-        </form>
-        <p className="login-hint">
-          Cuentas de ejemplo: admin@neoorders.com / Admin123! · empleado@neoorders.com / Empleado123!
-        </p>
-      </div>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="w-full max-w-md"
+      >
+        <Card className="border-border/50 shadow-xl">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-coral via-peach to-amber">
+              <svg viewBox="0 0 40 40" className="h-8 w-8">
+                <path d="M12 28 V12 L20 22 L28 12 V28" stroke="#fff" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <CardTitle className="text-2xl">NeoOrders</CardTitle>
+            <CardDescription>Sistema de gestión de pedidos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
+                >
+                  {error}
+                </motion.div>
+              )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Ingresando…' : 'Iniciar sesión'}
+              </Button>
+            </form>
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              Cuentas de ejemplo: admin@neoorders.com / Admin123! · empleado@neoorders.com / Empleado123!
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }
