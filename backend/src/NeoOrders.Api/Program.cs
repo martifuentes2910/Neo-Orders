@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using NeoOrders.Api.Infrastructure;
 using NeoOrders.Application.Contracts.Orders;
 using NeoOrders.Application.Contracts.Notifications;
 using NeoOrders.Application.Contracts.Import;
@@ -131,6 +132,8 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -162,6 +165,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseExceptionHandler();
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
