@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OrdersApi.Data;
 using OrdersApi.Models;
+using OrdersApi.Services;
 
 namespace OrdersApi.Controllers;
 
@@ -12,7 +13,8 @@ namespace OrdersApi.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public ProductsController(AppDbContext db) => _db = db;
+    private readonly ICsvImportService _csvImport;
+    public ProductsController(AppDbContext db, ICsvImportService csvImport) { _db = db; _csvImport = csvImport; }
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? category, [FromQuery] bool? onlyInStock)
@@ -83,5 +85,23 @@ public class ProductsController : ControllerBase
         _db.Products.Remove(p);
         await _db.SaveChangesAsync();
         return NoContent();
+    }
+
+    [HttpGet("import-csv/template")]
+    [Authorize(Roles = "Admin")]
+    public IActionResult Template() => File(System.Text.Encoding.UTF8.GetBytes("Sku;Name;Category;BasePrice;Cost;Stock;MinStockAlert;Active\n"), "text/csv; charset=utf-8", "plantilla.csv");
+
+    [HttpPost("import-csv")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ImportCsv([FromForm] IFormFile file, CancellationToken ct)
+    {
+        if (file == null) return BadRequest(new { message = "Debe seleccionar un archivo CSV." });
+        var ext = Path.GetExtension(file.FileName);
+        if (!string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "El archivo debe tener extensión .csv." });
+        await using var stream = file.OpenReadStream();
+        var result = await _csvImport.ImportProductsAsync(stream, ct);
+        if (result.Errors.Count > 0) return BadRequest(result);
+        return Ok(result);
     }
 }

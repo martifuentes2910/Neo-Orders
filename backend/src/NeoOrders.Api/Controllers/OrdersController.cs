@@ -14,10 +14,12 @@ public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IOrderService _orderService;
-    public OrdersController(AppDbContext db, IOrderService orderService)
+    private readonly ICsvImportService _csvImport;
+    public OrdersController(AppDbContext db, IOrderService orderService, ICsvImportService csvImport)
     {
         _db = db;
         _orderService = orderService;
+        _csvImport = csvImport;
     }
 
     [HttpGet]
@@ -111,6 +113,24 @@ public class OrdersController : ControllerBase
 
     [HttpGet("statuses")]
     public IActionResult Statuses() => Ok(OrderStatuses.All);
+
+    [HttpGet("import-csv/template")]
+    [Authorize(Roles = "Admin")]
+    public IActionResult Template() => File(System.Text.Encoding.UTF8.GetBytes("OrderNumber;ClientId;SellerId;ProductId;Cantidad\n"), "text/csv; charset=utf-8", "plantilla.csv");
+
+    [HttpPost("import-csv")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ImportCsv([FromForm] IFormFile file, CancellationToken ct)
+    {
+        if (file == null) return BadRequest(new { message = "Debe seleccionar un archivo CSV." });
+        var ext = Path.GetExtension(file.FileName);
+        if (!string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "El archivo debe tener extensión .csv." });
+        await using var stream = file.OpenReadStream();
+        var result = await _csvImport.ImportOrdersAsync(stream, ct);
+        if (result.Errors.Count > 0) return BadRequest(result);
+        return Ok(result);
+    }
 }
 
 public class CreateOrderDto
