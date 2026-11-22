@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.DTOs.Reportes;
+namespace NeoOrders.Application.DTOs.Reportes;
 
 /// <summary>Campos comunes de paginacion y discriminante para la union discriminada en TypeScript.</summary>
 public abstract class DetalleResponseBase

@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using NeoOrders.Domain.Orders;
 
-namespace OrdersApi.Models;
+namespace NeoOrders.Infrastructure.Models;
 
 public class Order
 {

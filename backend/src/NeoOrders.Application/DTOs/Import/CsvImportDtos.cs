@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.DTOs.Import;
+namespace NeoOrders.Application.DTOs.Import;
 
 public sealed class CsvImportErrorDto
 {

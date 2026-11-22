@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Data;
-using OrdersApi.Models;
-using OrdersApi.Services;
+using NeoOrders.Infrastructure.Data;
+using NeoOrders.Infrastructure.Models;
+using NeoOrders.Application.Contracts.Orders;
+using NeoOrders.Application.Contracts.Notifications;
+using NeoOrders.Application.Contracts.Import;
 
-namespace OrdersApi.Controllers;
+namespace NeoOrders.Api.Controllers;
 
 [ApiController]
 [Route("api/clients")]

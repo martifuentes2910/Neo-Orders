@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.DTOs.Productos;
+namespace NeoOrders.Application.DTOs.Productos;
 
 public record PriceAdjustmentRequest
 {

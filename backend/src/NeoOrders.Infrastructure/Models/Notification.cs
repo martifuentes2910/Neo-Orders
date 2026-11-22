@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace OrdersApi.Models;
+namespace NeoOrders.Infrastructure.Models;
 
 public class Notification
 {

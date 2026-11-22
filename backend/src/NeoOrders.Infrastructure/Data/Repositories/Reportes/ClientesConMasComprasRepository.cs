@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Application.Contracts.Reportes;
-using OrdersApi.Application.DTOs.Reportes;
+using NeoOrders.Application.Contracts.Reportes;
+using NeoOrders.Application.DTOs.Reportes;
 
-namespace OrdersApi.Data.Repositories.Reportes;
+namespace NeoOrders.Infrastructure.Data.Repositories.Reportes;
 
 /// <summary>Clientes con mas compras: agrupa por ClientId + nombre.</summary>
 public sealed class ClientesConMasComprasRepository : IClientesConMasComprasRepository

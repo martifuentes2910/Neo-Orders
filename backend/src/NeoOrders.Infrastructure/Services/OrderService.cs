@@ -1,9 +1,12 @@
+using NeoOrders.Application.Contracts.Orders;
+using NeoOrders.Application.Contracts.Notifications;
+using NeoOrders.Application.Contracts.Import;
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Data;
-using OrdersApi.Models;
+using NeoOrders.Infrastructure.Data;
+using NeoOrders.Infrastructure.Models;
 using NeoOrders.Domain.Orders;
 
-namespace OrdersApi.Services;
+namespace NeoOrders.Infrastructure.Services;
 
 public class OrderService : IOrderService
 {

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace OrdersApi.Models;
+namespace NeoOrders.Infrastructure.Models;
 
 public class Seller
 {

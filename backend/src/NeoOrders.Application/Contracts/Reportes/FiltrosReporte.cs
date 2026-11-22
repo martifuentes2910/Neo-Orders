@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.Contracts.Reportes;
+namespace NeoOrders.Application.Contracts.Reportes;
 
 /// <summary>Filtros compartidos por los reportes de resumen y de detalle.</summary>
 public sealed class FiltrosReporte

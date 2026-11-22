@@ -1,7 +1,7 @@
-using OrdersApi.Application.Contracts.Reportes;
-using OrdersApi.Application.DTOs.Reportes;
+using NeoOrders.Application.Contracts.Reportes;
+using NeoOrders.Application.DTOs.Reportes;
 
-namespace OrdersApi.Application.Services;
+namespace NeoOrders.Application.Services;
 
 public sealed class DashboardService : IDashboardService
 {

@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.DTOs.Reportes;
+namespace NeoOrders.Application.DTOs.Reportes;
 
 public sealed class FilaVendedorDto
 {

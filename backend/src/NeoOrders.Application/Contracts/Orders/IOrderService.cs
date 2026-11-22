@@ -1,4 +1,4 @@
-namespace OrdersApi.Services;
+namespace NeoOrders.Application.Contracts.Orders;
 
 public interface IOrderService
 {

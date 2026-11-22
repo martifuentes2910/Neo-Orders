@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.Contracts.Reportes;
+namespace NeoOrders.Application.Contracts.Reportes;
 
 /// <summary>Paginacion validada en servidor: 1-based, 25 por defecto, maximo 100.</summary>
 public sealed class Paginacion

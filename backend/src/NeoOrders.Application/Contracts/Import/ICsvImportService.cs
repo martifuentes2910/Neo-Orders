@@ -1,6 +1,6 @@
-using OrdersApi.Application.DTOs.Import;
+using NeoOrders.Application.DTOs.Import;
 
-namespace OrdersApi.Services;
+namespace NeoOrders.Application.Contracts.Import;
 
 public interface ICsvImportService
 {

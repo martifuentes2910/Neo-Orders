@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Application.Contracts.Reportes;
-using OrdersApi.Application.DTOs.Reportes;
-using OrdersApi.Models;
+using NeoOrders.Application.Contracts.Reportes;
+using NeoOrders.Application.DTOs.Reportes;
+using NeoOrders.Infrastructure.Models;
 using NeoOrders.Domain.Orders;
 
-namespace OrdersApi.Data.Repositories.Reportes;
+namespace NeoOrders.Infrastructure.Data.Repositories.Reportes;
 
 /// <summary>Metricas del panel. Sin filtros: el endpoint del panel no los expone.</summary>
 public sealed class DashboardMetricsRepository : IDashboardMetricsRepository

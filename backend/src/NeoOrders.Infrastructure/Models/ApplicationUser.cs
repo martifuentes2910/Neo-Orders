@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 
-namespace OrdersApi.Models;
+namespace NeoOrders.Infrastructure.Models;
 
 public class ApplicationUser : IdentityUser
 {

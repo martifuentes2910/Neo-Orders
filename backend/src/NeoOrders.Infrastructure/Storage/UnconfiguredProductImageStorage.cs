@@ -1,6 +1,6 @@
-using OrdersApi.Application.Contracts.Productos;
+using NeoOrders.Application.Contracts.Productos;
 
-namespace OrdersApi.Infrastructure.Storage;
+namespace NeoOrders.Infrastructure.Storage;
 
 /// <summary>
 /// Se registra cuando faltan credenciales de Cloudinary. La aplicación arranca igual y el CRUD de productos

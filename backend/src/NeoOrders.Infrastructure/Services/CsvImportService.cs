@@ -1,12 +1,15 @@
+using NeoOrders.Application.Contracts.Orders;
+using NeoOrders.Application.Contracts.Notifications;
+using NeoOrders.Application.Contracts.Import;
 using System.Globalization;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Application.DTOs.Import;
-using OrdersApi.Data;
-using OrdersApi.Models;
+using NeoOrders.Application.DTOs.Import;
+using NeoOrders.Infrastructure.Data;
+using NeoOrders.Infrastructure.Models;
 using NeoOrders.Domain.Orders;
 
-namespace OrdersApi.Services;
+namespace NeoOrders.Infrastructure.Services;
 
 public sealed class CsvImportService : ICsvImportService
 {

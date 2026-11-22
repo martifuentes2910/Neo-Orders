@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.Contracts.Productos;
+namespace NeoOrders.Application.Contracts.Productos;
 
 /// <summary>Imagen ya almacenada: URL pública e identificador interno del proveedor.</summary>
 public sealed record StoredImage(string Url, string PublicId);

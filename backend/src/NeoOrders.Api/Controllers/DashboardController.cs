@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrdersApi.Application.Services;
+using NeoOrders.Application.Services;
 
-namespace OrdersApi.Controllers;
+namespace NeoOrders.Api.Controllers;
 
 [ApiController]
 [Route("api/dashboard")]

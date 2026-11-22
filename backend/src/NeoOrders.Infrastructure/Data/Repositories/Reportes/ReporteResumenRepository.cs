@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Application.Contracts.Reportes;
-using OrdersApi.Application.DTOs.Reportes;
-using OrdersApi.Models;
+using NeoOrders.Application.Contracts.Reportes;
+using NeoOrders.Application.DTOs.Reportes;
+using NeoOrders.Infrastructure.Models;
 
-namespace OrdersApi.Data.Repositories.Reportes;
+namespace NeoOrders.Infrastructure.Data.Repositories.Reportes;
 
 /// <summary>Las cinco agregaciones del resumen. Contrato identico al anterior ReportService.</summary>
 public sealed class ReporteResumenRepository : IReporteResumenRepository

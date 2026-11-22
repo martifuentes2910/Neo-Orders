@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using OrdersApi.Models;
+using NeoOrders.Infrastructure.Models;
 
-namespace OrdersApi.Controllers;
+namespace NeoOrders.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]

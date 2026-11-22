@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrdersApi.Application.Contracts.Reportes;
-using OrdersApi.Application.Services;
+using NeoOrders.Application.Contracts.Reportes;
+using NeoOrders.Application.Services;
 
-namespace OrdersApi.Controllers;
+namespace NeoOrders.Api.Controllers;
 
 [ApiController]
 [Route("api/reports")]

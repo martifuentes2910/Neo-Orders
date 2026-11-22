@@ -1,6 +1,6 @@
-using OrdersApi.Application.DTOs.Reportes;
+using NeoOrders.Application.DTOs.Reportes;
 
-namespace OrdersApi.Application.Contracts.Reportes;
+namespace NeoOrders.Application.Contracts.Reportes;
 
 public interface IReporteResumenRepository
 {

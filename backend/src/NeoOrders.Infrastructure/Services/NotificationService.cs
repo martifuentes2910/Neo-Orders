@@ -1,10 +1,13 @@
+using NeoOrders.Application.Contracts.Orders;
+using NeoOrders.Application.Contracts.Notifications;
+using NeoOrders.Application.Contracts.Import;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity;
-using OrdersApi.Data;
-using OrdersApi.Models;
+using NeoOrders.Infrastructure.Data;
+using NeoOrders.Infrastructure.Models;
 
-namespace OrdersApi.Services;
+namespace NeoOrders.Infrastructure.Services;
 
 /// <summary>
 /// Registra eventos de la aplicación (altas, cambios y bajas de registros).

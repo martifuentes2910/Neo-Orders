@@ -1,4 +1,4 @@
-namespace OrdersApi.Application.Services;
+namespace NeoOrders.Application.Services;
 
 /// <summary>Validación de imágenes de producto: extensión, content-type, tamaño y firma del archivo.</summary>
 public static class ProductImageValidator

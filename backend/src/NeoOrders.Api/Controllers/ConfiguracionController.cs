@@ -2,10 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Data;
-using OrdersApi.Models;
+using NeoOrders.Infrastructure.Data;
+using NeoOrders.Infrastructure.Models;
 
-namespace OrdersApi.Controllers;
+namespace NeoOrders.Api.Controllers;
 
 [ApiController]
 [Route("api/config")]

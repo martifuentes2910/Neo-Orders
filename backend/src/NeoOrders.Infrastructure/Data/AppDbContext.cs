@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using OrdersApi.Models;
+using NeoOrders.Infrastructure.Models;
 
-namespace OrdersApi.Data;
+namespace NeoOrders.Infrastructure.Data;
 
 public class AppDbContext : IdentityDbContext<ApplicationUser>
 {
