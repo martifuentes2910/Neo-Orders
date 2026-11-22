@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using NeoOrders.Infrastructure.Data;
 using NeoOrders.Infrastructure.Models;
 
+using NeoOrders.Application.DTOs.Config;
+
 namespace NeoOrders.Api.Controllers;
 
 [ApiController]
@@ -79,12 +81,4 @@ public class ConfiguracionController : ControllerBase
         await DbSeeder.SeedAsync(HttpContext.RequestServices);
         return Ok(new { message = "Datos de ejemplo verificados/cargados" });
     }
-}
-
-public class PerfilDto
-{
-    public string Nombre { get; set; } = string.Empty;
-    public string Apellido { get; set; } = string.Empty;
-    public string Avatar { get; set; } = "avatar-1";
-    public string Tema { get; set; } = "claro";
 }

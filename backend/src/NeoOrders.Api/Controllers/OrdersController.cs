@@ -7,6 +7,7 @@ using NeoOrders.Application.Contracts.Orders;
 using NeoOrders.Application.Contracts.Notifications;
 using NeoOrders.Application.Contracts.Import;
 using NeoOrders.Domain.Orders;
+using NeoOrders.Application.DTOs.Orders;
 
 namespace NeoOrders.Api.Controllers;
 
@@ -134,32 +135,4 @@ public class OrdersController : ControllerBase
         if (result.Errors.Count > 0) return BadRequest(result);
         return Ok(result);
     }
-}
-
-public class CreateOrderDto
-{
-    public int ClientId { get; set; }
-    public int? SellerId { get; set; }
-    public int? ProductId { get; set; }
-    public string ProductName { get; set; } = string.Empty;
-    public int Cantidad { get; set; } = 1;
-    public decimal PrecioUnitario { get; set; }
-    public string? OrderNumber { get; set; }
-}
-
-public class UpdateOrderStatusDto
-{
-    public string Estado { get; set; } = string.Empty;
-}
-
-public class UpdateOrderDto
-{
-    public int Id { get; set; }
-    public int ClientId { get; set; }
-    public int? SellerId { get; set; }
-    public int? ProductId { get; set; }
-    public string ProductName { get; set; } = string.Empty;
-    public int Cantidad { get; set; } = 1;
-    public decimal PrecioUnitario { get; set; }
-    public string Estado { get; set; } = OrderStatuses.Pendiente;
 }

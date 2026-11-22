@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using NeoOrders.Infrastructure.Data;
 using NeoOrders.Infrastructure.Models;
 
+using NeoOrders.Application.DTOs.Users;
+
 namespace NeoOrders.Api.Controllers;
 
 [ApiController]
@@ -85,19 +87,4 @@ public class UsuariosController : ControllerBase
         await _userManager.DeleteAsync(user);
         return NoContent();
     }
-}
-
-public class CrearUsuarioDto
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-    public string Nombre { get; set; } = string.Empty;
-    public string Apellido { get; set; } = string.Empty;
-    public string? Avatar { get; set; }
-    public string Rol { get; set; } = "Empleado";
-}
-
-public class RolDto
-{
-    public string Rol { get; set; } = "Empleado";
 }

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NeoOrders.Infrastructure.Models;
 
+using NeoOrders.Application.DTOs.Auth;
+
 namespace NeoOrders.Api.Controllers;
 
 [ApiController]
@@ -61,21 +63,4 @@ public class AuthController : ControllerBase
             Roles = roles.ToList()
         };
     }
-}
-
-public class LoginDto
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-}
-
-public class UserDto
-{
-    public string Id { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string Nombre { get; set; } = string.Empty;
-    public string Apellido { get; set; } = string.Empty;
-    public string Avatar { get; set; } = string.Empty;
-    public string Tema { get; set; } = string.Empty;
-    public List<string> Roles { get; set; } = new();
 }

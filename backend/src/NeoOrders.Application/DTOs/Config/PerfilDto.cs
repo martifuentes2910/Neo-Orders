@@ -1,0 +1,10 @@
+namespace NeoOrders.Application.DTOs.Config;
+
+public class PerfilDto
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string Apellido { get; set; } = string.Empty;
+    public string Avatar { get; set; } = "avatar-1";
+    public string Tema { get; set; } = "claro";
+    public string Paleta { get; set; } = "coral";
+}
