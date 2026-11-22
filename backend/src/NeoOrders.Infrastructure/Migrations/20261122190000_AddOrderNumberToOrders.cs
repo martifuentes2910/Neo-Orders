@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace OrdersApi.Migrations
+namespace NeoOrders.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddOrderNumberToOrders : Migration

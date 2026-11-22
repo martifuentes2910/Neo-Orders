@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>78b9aeaa-08a0-4b57-9b4c-744f9c9fa99a</UserSecretsId>
-    <RootNamespace>OrdersApi</RootNamespace>
+    <RootNamespace>NeoOrders.Api</RootNamespace>
     <AssemblyName>NeoOrders.Api</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
@@ -28,3 +28,4 @@
     <ProjectReference Include="..\NeoOrders.Infrastructure\NeoOrders.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
+

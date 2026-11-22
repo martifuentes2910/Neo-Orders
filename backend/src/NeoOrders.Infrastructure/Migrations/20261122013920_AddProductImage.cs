@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace OrdersApi.Migrations
+namespace NeoOrders.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddProductImage : Migration

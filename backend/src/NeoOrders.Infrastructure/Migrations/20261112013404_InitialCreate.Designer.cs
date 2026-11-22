@@ -9,7 +9,7 @@ using NeoOrders.Infrastructure.Data;
 
 #nullable disable
 
-namespace OrdersApi.Migrations
+namespace NeoOrders.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20261112013404_InitialCreate")]
@@ -158,7 +158,7 @@ namespace OrdersApi.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.ApplicationUser", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -239,7 +239,7 @@ namespace OrdersApi.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.Client", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.Client", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -275,7 +275,7 @@ namespace OrdersApi.Migrations
                     b.ToTable("Clients");
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.CompanySettings", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.CompanySettings", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -302,7 +302,7 @@ namespace OrdersApi.Migrations
                     b.ToTable("CompanySettings");
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.Order", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.Order", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -354,7 +354,7 @@ namespace OrdersApi.Migrations
                     b.ToTable("Orders");
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.Product", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.Product", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -405,7 +405,7 @@ namespace OrdersApi.Migrations
                     b.ToTable("Products");
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.Seller", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.Seller", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -454,7 +454,7 @@ namespace OrdersApi.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("OrdersApi.Models.ApplicationUser", null)
+                    b.HasOne("NeoOrders.Infrastructure.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -463,7 +463,7 @@ namespace OrdersApi.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("OrdersApi.Models.ApplicationUser", null)
+                    b.HasOne("NeoOrders.Infrastructure.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -478,7 +478,7 @@ namespace OrdersApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("OrdersApi.Models.ApplicationUser", null)
+                    b.HasOne("NeoOrders.Infrastructure.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -487,27 +487,27 @@ namespace OrdersApi.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("OrdersApi.Models.ApplicationUser", null)
+                    b.HasOne("NeoOrders.Infrastructure.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.Order", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.Order", b =>
                 {
-                    b.HasOne("OrdersApi.Models.Client", "Client")
+                    b.HasOne("NeoOrders.Infrastructure.Models.Client", "Client")
                         .WithMany("Orders")
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("OrdersApi.Models.Product", "Product")
+                    b.HasOne("NeoOrders.Infrastructure.Models.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("OrdersApi.Models.Seller", "Seller")
+                    b.HasOne("NeoOrders.Infrastructure.Models.Seller", "Seller")
                         .WithMany("Orders")
                         .HasForeignKey("SellerId")
                         .OnDelete(DeleteBehavior.SetNull);
@@ -519,12 +519,12 @@ namespace OrdersApi.Migrations
                     b.Navigation("Seller");
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.Client", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.Client", b =>
                 {
                     b.Navigation("Orders");
                 });
 
-            modelBuilder.Entity("OrdersApi.Models.Seller", b =>
+            modelBuilder.Entity("NeoOrders.Infrastructure.Models.Seller", b =>
                 {
                     b.Navigation("Orders");
                 });
