@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrdersApi.Services;
+using OrdersApi.Application.Services;
 
 namespace OrdersApi.Controllers;
 
@@ -9,9 +9,9 @@ namespace OrdersApi.Controllers;
 [Authorize]
 public class DashboardController : ControllerBase
 {
-    private readonly IReportService _reportService;
-    public DashboardController(IReportService reportService) => _reportService = reportService;
+    private readonly IDashboardService _dashboardService;
+    public DashboardController(IDashboardService dashboardService) => _dashboardService = dashboardService;
 
     [HttpGet("metrics")]
-    public async Task<IActionResult> Metrics() => Ok(await _reportService.GetDashboardMetricsAsync());
+    public async Task<IActionResult> Metrics() => Ok(await _dashboardService.GetMetricsAsync());
 }

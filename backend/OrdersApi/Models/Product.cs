@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace OrdersApi.Models;
 
@@ -37,4 +38,13 @@ public class Product
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public bool IsCriticalStock => Stock <= MinStockAlert;
+
+    // KAN-23: imagen alojada en Cloudinary. El cliente sólo necesita la URL pública.
+    [StringLength(500)]
+    public string? ImageUrl { get; set; }
+
+    // KAN-23: identificador interno para reemplazar o borrar el asset; nunca se expone en la API.
+    [JsonIgnore]
+    [StringLength(200)]
+    public string? ImagePublicId { get; set; }
 }

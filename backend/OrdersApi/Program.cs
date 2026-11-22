@@ -2,13 +2,23 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OrdersApi.Services;
+using OrdersApi.Application.Contracts.Productos;
+using OrdersApi.Application.Contracts.Reportes;
+using OrdersApi.Application.Services;
 using OrdersApi.Data;
+using OrdersApi.Data.Repositories.Reportes;
+using OrdersApi.Infrastructure.Storage;
 using OrdersApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Services
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews(options =>
+{
+    // Validate the antiforgery token on every unsafe request by default.
+    // Login/logout opt out with [IgnoreAntiforgeryToken].
+    options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute());
+});
 
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -18,7 +28,42 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Services
 builder.Services.AddScoped<IOrderService, OrderService>();
-builder.Services.AddScoped<IReportService, ReportService>();
+
+// Reportes: contratos en Application, implementaciones en Data (DIP).
+builder.Services.AddScoped<IReporteResumenRepository, ReporteResumenRepository>();
+builder.Services.AddScoped<IDashboardMetricsRepository, DashboardMetricsRepository>();
+builder.Services.AddScoped<IVentasVendedorRepository, VentasVendedorRepository>();
+builder.Services.AddScoped<IProductosVendidosRepository, ProductosVendidosRepository>();
+builder.Services.AddScoped<IClientesConMasComprasRepository, ClientesConMasComprasRepository>();
+builder.Services.AddScoped<IReporteService, ReporteService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IVentasVendedorService, VentasVendedorService>();
+builder.Services.AddScoped<IProductosVendidosService, ProductosVendidosService>();
+builder.Services.AddScoped<IClientesConMasComprasService, ClientesConMasComprasService>();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<ICsvImportService, CsvImportService>();
+
+// KAN-23: imágenes de producto en Cloudinary. Sin credenciales la app arranca y el CRUD sigue funcionando.
+var cloudName = builder.Configuration["Cloudinary:CloudName"];
+var cloudApiKey = builder.Configuration["Cloudinary:ApiKey"];
+var cloudApiSecret = builder.Configuration["Cloudinary:ApiSecret"];
+var cloudFolder = builder.Configuration["Cloudinary:Folder"] ?? "neoorders/products";
+var cloudinaryConfigured = !string.IsNullOrWhiteSpace(cloudName)
+    && !string.IsNullOrWhiteSpace(cloudApiKey)
+    && !string.IsNullOrWhiteSpace(cloudApiSecret);
+
+if (cloudinaryConfigured)
+{
+    builder.Services.AddSingleton<IProductImageStorage>(sp => new CloudinaryProductImageStorage(
+        cloudName!, cloudApiKey!, cloudApiSecret!, cloudFolder,
+        sp.GetRequiredService<ILogger<CloudinaryProductImageStorage>>()));
+}
+else
+{
+    builder.Services.AddSingleton<IProductImageStorage, UnconfiguredProductImageStorage>();
+}
 
 // Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -69,7 +114,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://localhost:5173")
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "https://localhost:5173",
+                "http://127.0.0.1:5173",
+                "https://127.0.0.1:5173",
+                "http://localhost:4173",
+                "http://127.0.0.1:4173")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -79,6 +130,12 @@ builder.Services.AddCors(options =>
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+if (!cloudinaryConfigured)
+{
+    app.Logger.LogWarning(
+        "Cloudinary no está configurado. Las imágenes de producto no se pueden cargar hasta definir Cloudinary__CloudName, Cloudinary__ApiKey y Cloudinary__ApiSecret.");
+}
 
 if (app.Environment.IsDevelopment())
 {

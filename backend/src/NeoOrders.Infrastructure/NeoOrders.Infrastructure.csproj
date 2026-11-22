@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NeoOrders.Application\NeoOrders.Application.csproj" />
+    <ProjectReference Include="..\NeoOrders.Domain\NeoOrders.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CloudinaryDotNet" Version="1.29.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.1" />
+  </ItemGroup>
+</Project>

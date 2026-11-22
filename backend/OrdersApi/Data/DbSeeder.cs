@@ -78,7 +78,7 @@ public static class DbSeeder
             await db.SaveChangesAsync();
 
             var rnd = new Random(42);
-            var estados = new[] { "Pendiente", "En proceso", "Enviado", "Entregado", "Cancelado" };
+            var estados = OrderStatuses.All;
             var pedidos = new List<Order>();
             for (int i = 0; i < 60; i++)
             {
@@ -122,6 +122,7 @@ public static class DbSeeder
                 Apellido = apellido,
                 Avatar = avatar,
                 Tema = tema,
+                Paleta = "coral",
                 EmailConfirmed = true
             };
             var result = await userManager.CreateAsync(user, password);
@@ -129,6 +130,18 @@ public static class DbSeeder
             {
                 await userManager.AddToRoleAsync(user, role);
             }
+        }
+        else
+        {
+            user.UserName = userName;
+            user.Nombre = nombre;
+            user.Apellido = apellido;
+            user.Avatar = avatar;
+            user.Tema = tema;
+            if (string.IsNullOrWhiteSpace(user.Paleta)) user.Paleta = "coral";
+            await userManager.UpdateAsync(user);
+            if (!await userManager.IsInRoleAsync(user, role))
+                await userManager.AddToRoleAsync(user, role);
         }
     }
 }

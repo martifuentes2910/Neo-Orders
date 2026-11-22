@@ -8,4 +8,5 @@ public class ApplicationUser : IdentityUser
     public string Apellido { get; set; } = string.Empty;
     public string Avatar { get; set; } = "avatar-1";
     public string Tema { get; set; } = "claro";
+    public string Paleta { get; set; } = "coral";
 }

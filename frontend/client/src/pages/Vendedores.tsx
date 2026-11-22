@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,13 +11,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import SortableTableHead from '@/components/SortableTableHead';
+import { useTableSort } from '@/hooks/useTableSort';
 import { toast } from 'sonner';
+import { motion, useReducedMotion } from 'framer-motion';
+
+let cachedVendedores: any[] | null = null;
 
 const emptyForm = { name: '', email: '', phone: '', commissionPercentage: 5, active: true };
 
 export default function Vendedores() {
-  const [sellers, setSellers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const reduceMotion = useReducedMotion();
+  const { user } = useAuth();
+  const isAdmin = user?.roles?.includes('Admin');
+  const [sellers, setSellers] = useState<any[]>(cachedVendedores || []);
+  const [loading, setLoading] = useState(!cachedVendedores);
+  const [search, setSearch] = useState('');
+  const [activoFilter, setActivoFilter] = useState('Todos');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
@@ -25,8 +36,12 @@ export default function Vendedores() {
   const [deleting, setDeleting] = useState<number | null>(null);
 
   const load = async () => {
-    setLoading(true);
-    try { setSellers(await api.sellers.list()); } catch { toast.error('Error al cargar vendedores'); }
+    if (!cachedVendedores) setLoading(true);
+    try { 
+      const data = await api.sellers.list(); 
+      cachedVendedores = data;
+      setSellers(data); 
+    } catch { toast.error('Error al cargar vendedores'); }
     finally { setLoading(false); }
   };
 
@@ -72,54 +87,91 @@ export default function Vendedores() {
     }
   };
 
+  const filtered = sellers.filter((s) => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q);
+    const matchActivo = activoFilter === 'Todos' || (activoFilter === 'Activos' ? s.active : !s.active);
+    return matchSearch && matchActivo;
+  });
+
+  const { sorted, sort, toggle } = useTableSort(filtered, {
+    id: (s) => s.id,
+    nombre: (s) => s.name,
+    email: (s) => s.email,
+    telefono: (s) => s.phone,
+    comision: (s) => s.commissionPercentage,
+    activo: (s) => s.active,
+  });
+
   return (
-    <div className="space-y-6">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Vendedores</h1>
+        <motion.div initial={reduceMotion ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.25 }}>
+          <h1 className="text-[32px] font-bold tracking-tight">Vendedores</h1>
           <p className="text-sm text-muted-foreground">Gestión de vendedores y comisiones.</p>
+        </motion.div>
+        {isAdmin && (
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuevo vendedor
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Buscar por nombre o email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuevo vendedor
-        </Button>
+        <Select value={activoFilter} onValueChange={setActivoFilter}>
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Todos">Todos</SelectItem>
+            <SelectItem value="Activos">Activos</SelectItem>
+            <SelectItem value="Inactivos">Inactivos</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-3 p-6">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-          ) : sellers.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">No hay vendedores.</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>#</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead className="text-right">Comisión %</TableHead>
-                  <TableHead>Activo</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <SortableTableHead label="#" sortKey="id" sort={sort} onSort={toggle} />
+                  <SortableTableHead label="Nombre" sortKey="nombre" sort={sort} onSort={toggle} />
+                  <SortableTableHead label="Email" sortKey="email" sort={sort} onSort={toggle} />
+                  <SortableTableHead label="Teléfono" sortKey="telefono" sort={sort} onSort={toggle} />
+                  <SortableTableHead label="Comisión %" sortKey="comision" sort={sort} onSort={toggle} align="right" className="text-right" />
+                  <SortableTableHead label="Activo" sortKey="activo" sort={sort} onSort={toggle} />
+                  {isAdmin && <TableHead className="text-right">Acciones</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sellers.map((s) => (
+                {sorted.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.id}</TableCell>
                     <TableCell>{s.name}</TableCell>
                     <TableCell className="text-muted-foreground">{s.email}</TableCell>
                     <TableCell>{s.phone || '-'}</TableCell>
-                    <TableCell className="text-right">{s.commissionPercentage}%</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.commissionPercentage}%</TableCell>
                     <TableCell>
                       <Badge variant={s.active ? 'default' : 'secondary'}>{s.active ? 'Sí' : 'No'}</Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remove(s.id)} disabled={deleting === s.id}><Trash2 className="h-3.5 w-3.5" /></Button>
-                      </div>
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remove(s.id)} disabled={deleting === s.id}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -168,6 +220,6 @@ export default function Vendedores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }

@@ -1,4 +1,55 @@
-const BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5286/api';
+import type {
+  ClientesComprasResponse,
+  DashboardMetricsResponse,
+  FiltrosReporteParams,
+  ProductosVendidosResponse,
+  ReporteResumenResponse,
+  VentasVendedorResponse,
+} from './types/reportes';
+
+export interface PriceAdjustmentItem {
+  id: number;
+  sku: string;
+  name: string;
+  currentBasePrice: number;
+  newBasePrice: number;
+}
+
+export interface PriceAdjustmentPreviewResponse {
+  percent: number;
+  factor: number;
+  affectedCount: number;
+  skippedInactiveCount: number;
+  items: PriceAdjustmentItem[];
+  errors: string[];
+}
+
+export interface PriceAdjustmentApplyResponse {
+  affectedCount: number;
+  percent: number;
+  factor: number;
+  appliedAtUtc: string;
+}
+
+export interface CsvImportError {
+  row: number;
+  field: string;
+  value: string;
+  message: string;
+}
+
+export interface CsvImportResult {
+  totalRows: number;
+  validRows: number;
+  imported: number;
+  errors: CsvImportError[];
+}
+
+const BASE =
+  (import.meta as any).env?.VITE_API_URL ||
+  (typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:5286/api`
+    : 'http://localhost:5286/api');
 
 let csrfToken: string | null = null;
 
@@ -27,15 +78,19 @@ async function handle<T>(res: Response): Promise<T> {
   }
   if (!res.ok) {
     let message = `Error ${res.status}`;
+    let body: any = null;
     try {
-      const body = await res.json();
+      body = await res.json();
       if (body?.message) message = body.message;
+      else if (Array.isArray(body?.errors) && body.errors[0]?.row) message = 'El archivo contiene errores de validación.';
       else if (body?.errors) message = Object.values(body.errors).flat().join(' ');
       else if (body?.title) message = body.title;
     } catch {
       /* ignore */
     }
-    throw new Error(message);
+    const err: any = new Error(message);
+    if (body) err.body = body;
+    throw err;
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get('content-type') || '';
@@ -45,8 +100,10 @@ async function handle<T>(res: Response): Promise<T> {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    // KAN-23: con FormData el navegador debe fijar el boundary del multipart.
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   };
   if (method !== 'GET' && method !== 'HEAD') {
@@ -68,6 +125,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return handle<T>(res);
 }
 
+function buildReporteQuery(filtros?: FiltrosReporteParams): string {
+  const params = new URLSearchParams();
+  if (filtros?.desde) params.set('desde', filtros.desde);
+  if (filtros?.hasta) params.set('hasta', filtros.hasta);
+  if (filtros?.clientId) params.set('clientId', String(filtros.clientId));
+  if (filtros?.sellerId) params.set('sellerId', String(filtros.sellerId));
+  if (filtros?.estado && filtros.estado !== 'Todos') params.set('estado', filtros.estado);
+  if (filtros?.page && filtros.page !== 1) params.set('page', String(filtros.page));
+  if (filtros?.pageSize && filtros.pageSize !== 25) params.set('pageSize', String(filtros.pageSize));
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
@@ -76,66 +146,116 @@ export const api = {
 
   clients: {
     list: (search?: string) => request<any[]>(`/clients${search ? '?search=' + encodeURIComponent(search) : ''}`),
-    get: (id: number) => request<any>(`/clients/${id}`),
     create: (data: any) => request<any>('/clients', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) => request<void>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/clients/${id}`, { method: 'DELETE' }),
+    templateUrl: () => `${BASE}/clients/import-csv/template`,
+    importCsv: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return request<CsvImportResult>('/clients/import-csv', { method: 'POST', body });
+    },
   },
 
   orders: {
-    list: (search?: string, estado?: string, clientId?: number, sellerId?: number) => {
+    list: (
+      search?: string,
+      estado?: string,
+      clientId?: number,
+      sellerId?: number,
+      productId?: number,
+      desde?: string,
+      hasta?: string
+    ) => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (estado && estado !== 'Todos') params.set('estado', estado);
       if (clientId) params.set('clientId', String(clientId));
       if (sellerId) params.set('sellerId', String(sellerId));
+      if (productId) params.set('productId', String(productId));
+      if (desde) params.set('desde', desde);
+      if (hasta) params.set('hasta', hasta);
       const qs = params.toString();
       return request<any[]>(`/orders${qs ? '?' + qs : ''}`);
     },
-    get: (id: number) => request<any>(`/orders/${id}`),
     create: (data: any) => request<any>('/orders', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    // KAN-16: único camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
+    updateStatus: (id: number, estado: string) => request<void>(`/orders/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
     remove: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
-    statuses: () => request<string[]>('/orders/statuses'),
+    templateUrl: () => `${BASE}/orders/import-csv/template`,
+    importCsv: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return request<CsvImportResult>('/orders/import-csv', { method: 'POST', body });
+    },
   },
 
   products: {
-    list: (search?: string, category?: string, onlyInStock?: boolean) => {
+    list: (search?: string, category?: string, onlyInStock?: boolean, sku?: string, nombre?: string) => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (category && category !== 'Todos') params.set('category', category);
       if (onlyInStock) params.set('onlyInStock', 'true');
+      if (sku) params.set('sku', sku);
+      if (nombre) params.set('nombre', nombre);
       const qs = params.toString();
       return request<any[]>(`/products${qs ? '?' + qs : ''}`);
     },
     categories: () => request<string[]>('/products/categories'),
-    get: (id: number) => request<any>(`/products/${id}`),
     create: (data: any) => request<any>('/products', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) => request<void>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    // KAN-23: la imagen se sube en un endpoint dedicado para no cambiar el contrato JSON.
+    uploadImage: (id: number, file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return request<{ imageUrl: string }>(`/products/${id}/image`, { method: 'POST', body });
+    },
+    removeImage: (id: number) => request<void>(`/products/${id}/image`, { method: 'DELETE' }),
+    previewPriceAdjustment: (percent: number) =>
+      request<PriceAdjustmentPreviewResponse>('/products/price-adjustment/preview', {
+        method: 'POST',
+        body: JSON.stringify({ percent }),
+      }),
+    applyPriceAdjustment: (percent: number) =>
+      request<PriceAdjustmentApplyResponse>('/products/price-adjustment/apply', {
+        method: 'POST',
+        body: JSON.stringify({ percent }),
+      }),
     remove: (id: number) => request<void>(`/products/${id}`, { method: 'DELETE' }),
+    templateUrl: () => `${BASE}/products/import-csv/template`,
+    importCsv: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return request<CsvImportResult>('/products/import-csv', { method: 'POST', body });
+    },
   },
 
   sellers: {
     list: (onlyActive?: boolean) => request<any[]>(`/sellers${onlyActive ? '?onlyActive=true' : ''}`),
-    get: (id: number) => request<any>(`/sellers/${id}`),
     create: (data: any) => request<any>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) => request<void>(`/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/sellers/${id}`, { method: 'DELETE' }),
   },
 
   dashboard: {
-    metricas: () => request<any>('/dashboard/metrics'),
+    metricas: () => request<DashboardMetricsResponse>('/dashboard/metrics'),
   },
 
-  reports: (filtros?: { desde?: string; hasta?: string; clientId?: number; sellerId?: number; estado?: string }) => {
-    const params = new URLSearchParams();
-    if (filtros?.desde) params.set('desde', filtros.desde);
-    if (filtros?.hasta) params.set('hasta', filtros.hasta);
-    if (filtros?.clientId) params.set('clientId', String(filtros.clientId));
-    if (filtros?.sellerId) params.set('sellerId', String(filtros.sellerId));
-    if (filtros?.estado && filtros.estado !== 'Todos') params.set('estado', filtros.estado);
-    const qs = params.toString();
-    return request<any>(`/reports${qs ? '?' + qs : ''}`);
+  notifications: {
+    list: (take = 60) => request<any>(`/notifications?take=${take}`),
+  },
+
+  reports: (filtros?: FiltrosReporteParams) =>
+    request<ReporteResumenResponse>(`/reports${buildReporteQuery(filtros)}`),
+
+  reportesDetalle: {
+    vendedores: (filtros?: FiltrosReporteParams) =>
+      request<VentasVendedorResponse>(`/reports/detalle/vendedores${buildReporteQuery(filtros)}`),
+    productos: (filtros?: FiltrosReporteParams) =>
+      request<ProductosVendidosResponse>(`/reports/detalle/productos${buildReporteQuery(filtros)}`),
+    clientes: (filtros?: FiltrosReporteParams) =>
+      request<ClientesComprasResponse>(`/reports/detalle/clientes${buildReporteQuery(filtros)}`),
   },
 
   config: {
@@ -148,14 +268,12 @@ export const api = {
       update: (data: any) => request<any>('/config/profile', { method: 'PUT', body: JSON.stringify(data) }),
     },
     seed: () => request<any>('/config/seed', { method: 'POST' }),
+    clear: () => request<any>('/config/clear', { method: 'POST' }),
   },
 
   users: {
     list: () => request<any[]>('/users'),
     create: (data: any) => request<any>('/users', { method: 'POST', body: JSON.stringify(data) }),
-    setRol: (id: string, rol: string) => request<void>(`/users/${id}/rol`, { method: 'PUT', body: JSON.stringify({ rol }) }),
     remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
   },
-
-  antiforgery: fetchCsrfToken,
 };

@@ -13,6 +13,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Seller> Sellers => Set<Seller>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.Property(o => o.PrecioUnitario).HasPrecision(18, 2);
             entity.Property(o => o.Total).HasPrecision(18, 2);
+            entity.Property(o => o.OrderNumber).HasMaxLength(50);
+            entity.HasIndex(o => o.OrderNumber).IsUnique().HasFilter("[OrderNumber] IS NOT NULL");
             entity.HasOne(o => o.Client)
                   .WithMany(c => c.Orders)
                   .HasForeignKey(o => o.ClientId)
@@ -46,6 +49,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(p => p.Sku).IsUnique();
             entity.Property(p => p.BasePrice).HasPrecision(18, 2);
             entity.Property(p => p.Cost).HasPrecision(18, 2);
+            entity.Property(p => p.ImageUrl).HasMaxLength(500);
+            entity.Property(p => p.ImagePublicId).HasMaxLength(200);
         });
 
         modelBuilder.Entity<Seller>(entity =>
@@ -57,6 +62,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<CompanySettings>(entity =>
         {
             entity.Property(c => c.TipoDeCambio).HasPrecision(18, 4);
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasIndex(n => n.Fecha);
         });
     }
 }

@@ -66,7 +66,7 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateOrderDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var result = await _orderService.CreateAsync(dto.ClientId, dto.SellerId, dto.ProductId, dto.ProductName, dto.Cantidad, dto.PrecioUnitario);
+        var result = await _orderService.CreateAsync(dto.ClientId, dto.SellerId, dto.ProductId, dto.Cantidad, dto.OrderNumber);
         if (!result.Success) return BadRequest(new { message = result.Error });
         return CreatedAtAction(nameof(Get), new { id = result.OrderId }, new { id = result.OrderId });
     }
@@ -76,8 +76,27 @@ public class OrdersController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var ok = await _orderService.UpdateAsync(id, dto.ClientId, dto.SellerId, dto.ProductId, dto.ProductName, dto.Cantidad, dto.PrecioUnitario, dto.Estado);
-        if (!ok) return NotFound();
+        var current = await _db.Orders.AsNoTracking().Where(o => o.Id == id).Select(o => o.Estado).FirstOrDefaultAsync();
+        if (current != null && OrderStatuses.EditLocked.Contains(current))
+        {
+            var statusResult = await _orderService.UpdateStatusAsync(id, dto.Estado);
+            if (statusResult.NotFound) return NotFound(new { message = statusResult.Error });
+            if (!statusResult.Success) return BadRequest(new { message = statusResult.Error });
+            return NoContent();
+        }
+
+        var result = await _orderService.UpdateAsync(id, dto.ClientId, dto.SellerId, dto.Cantidad, dto.Estado);
+        if (result.NotFound) return NotFound(new { message = result.Error });
+        if (!result.Success) return BadRequest(new { message = result.Error });
+        return NoContent();
+    }
+
+    [HttpPatch("{id:int}/estado")]
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateOrderStatusDto dto)
+    {
+        var result = await _orderService.UpdateStatusAsync(id, dto.Estado);
+        if (result.NotFound) return NotFound(new { message = result.Error });
+        if (!result.Success) return BadRequest(new { message = result.Error });
         return NoContent();
     }
 
@@ -102,6 +121,12 @@ public class CreateOrderDto
     public string ProductName { get; set; } = string.Empty;
     public int Cantidad { get; set; } = 1;
     public decimal PrecioUnitario { get; set; }
+    public string? OrderNumber { get; set; }
+}
+
+public class UpdateOrderStatusDto
+{
+    public string Estado { get; set; } = string.Empty;
 }
 
 public class UpdateOrderDto

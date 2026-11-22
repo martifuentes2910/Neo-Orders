@@ -26,3 +26,13 @@ Thumbs.db
 
 # OpenCode
 .opencode/
+
+# Temp/local artifacts
+.playwright-mcp/
+cookies.txt
+*-debug.png
+neoorders-debug.png
+
+# Docs (administered separately)
+docs/
+

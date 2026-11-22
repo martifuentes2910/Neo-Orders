@@ -3,43 +3,24 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
+import { useNotifications } from '../context/NotificationsContext';
 import { motion } from 'framer-motion';
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  Users,
-  Package,
-  Briefcase,
-  BarChart3,
-  Settings,
-  Sun,
-  Moon,
-  LogOut,
-  Menu,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { Sun, Moon, LogOut, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import AvatarMemphis from '@/components/AvatarMemphis';
+import UserAvatar from '@/components/UserAvatar';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Logo from '@/components/Logo';
-
-const NAV = [
-  { to: '/panel', label: 'Panel', icon: LayoutDashboard },
-  { to: '/pedidos', label: 'Pedidos', icon: ShoppingCart },
-  { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/productos', label: 'Productos', icon: Package },
-  { to: '/vendedores', label: 'Vendedores', icon: Briefcase },
-  { to: '/reportes', label: 'Reportes', icon: BarChart3 },
-  { to: '/configuracion', label: 'Configuración', icon: Settings },
-];
+import CommandPalette from '@/components/CommandPalette';
+import HelpButton from '@/components/HelpButton';
+import { navFor } from '../navigation';
 
 function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const { user, logout } = useAuth();
-  const { resolved, toggle } = useTheme();
+  const { resolved, toggle, palette } = useTheme();
   const { company } = useSettings();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -47,9 +28,12 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
     navigate('/login');
   };
 
+  const navItems = navFor(user?.roles);
+  const isClean = palette === 'clean';
+
   return (
     <TooltipProvider delayDuration={0}>
-      <div className={`flex h-full flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ${collapsed ? 'items-center px-2 py-4' : 'gap-4 p-4'}`}>
+      <div className={`flex h-full flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ${collapsed ? 'items-center px-2 py-4' : 'gap-3 p-4'}`}>
         {/* Logo */}
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-2 py-1'}`}>
           <Logo size={collapsed ? 32 : 36} />
@@ -58,7 +42,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: 'auto' }}
               exit={{ opacity: 0, width: 0 }}
-              className="text-sm font-bold tracking-tight text-sidebar-foreground"
+              className="text-base font-extrabold tracking-tight text-sidebar-foreground"
             >
               {company?.nombreEmpresa || 'NeoOrders'}
             </motion.span>
@@ -67,7 +51,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
 
         {/* Nav */}
         <nav className="flex flex-1 flex-col gap-1">
-          {NAV.map((n) => {
+          {navItems.map((n) => {
             const Icon = n.icon;
             const link = (
               <NavLink
@@ -75,17 +59,29 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
                 to={n.to}
                 onClick={onNavigate}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                  `flex items-center gap-3 rounded-xl px-3 py-3 text-[15px] font-medium transition-all duration-200 ${
                     collapsed ? 'justify-center px-2' : ''
                   } ${
                     isActive
-                      ? 'bg-primary/20 text-primary shadow-sm'
-                      : 'text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground'
+                      ? isClean
+                        ? 'bg-[rgba(143,209,79,0.18)] text-sidebar-foreground shadow-sm'
+                        : 'bg-primary/20 text-primary shadow-sm'
+                      : 'text-sidebar-muted hover:bg-[var(--sidebar-hover)] hover:text-sidebar-foreground'
                   }`
                 }
               >
-                <Icon className="h-5 w-5 shrink-0" />
+                <span className="relative shrink-0">
+                  <Icon className="h-[22px] w-[22px]" />
+                  {collapsed && n.to === '/notificaciones' && unreadCount > 0 && (
+                    <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-sidebar ${isClean ? 'bg-[var(--clean-orange)]' : 'bg-primary'}`} />
+                  )}
+                </span>
                 {!collapsed && <span className="truncate">{n.label}</span>}
+                {!collapsed && n.to === '/notificaciones' && unreadCount > 0 && (
+                  <span className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold ${isClean ? 'bg-[var(--clean-green)] text-[#101915]' : 'bg-primary text-primary-foreground'}`}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </NavLink>
             );
             return collapsed ? (
@@ -110,7 +106,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
               <TooltipTrigger asChild>
                 <button
                   onClick={toggle}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg text-sidebar-muted transition-colors hover:bg-white/5 hover:text-sidebar-foreground"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg text-sidebar-muted transition-colors hover:bg-[var(--sidebar-hover)] hover:text-sidebar-foreground"
                 >
                   {resolved === 'oscuro' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
@@ -122,7 +118,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
           ) : (
             <button
               onClick={toggle}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted transition-colors hover:bg-white/5 hover:text-sidebar-foreground"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted transition-colors hover:bg-[var(--sidebar-hover)] hover:text-sidebar-foreground"
             >
               {resolved === 'oscuro' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               <span>{resolved === 'oscuro' ? 'Modo claro' : 'Modo oscuro'}</span>
@@ -134,7 +130,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex h-10 w-10 items-center justify-center">
-                  <AvatarMemphis preset={parseInt((user?.avatar || 'avatar-1').replace('avatar-', '')) - 1} size={36} />
+                  <UserAvatar avatar={user?.avatar} size={36} />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
@@ -143,7 +139,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
             </Tooltip>
           ) : (
             <div className="flex items-center gap-3 px-2 py-1">
-              <AvatarMemphis preset={parseInt((user?.avatar || 'avatar-1').replace('avatar-', '')) - 1} size={36} />
+              <UserAvatar avatar={user?.avatar} size={40} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-sidebar-foreground">
                   {user?.nombre} {user?.apellido}
@@ -161,7 +157,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
                   variant="ghost"
                   size="icon"
                   onClick={handleLogout}
-                  className="h-10 w-10 text-sidebar-muted hover:bg-white/5 hover:text-destructive"
+                  className="h-10 w-10 text-sidebar-muted hover:bg-[var(--sidebar-hover)] hover:text-destructive"
                 >
                   <LogOut className="h-5 w-5" />
                 </Button>
@@ -175,7 +171,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="justify-start gap-3 text-sidebar-muted hover:bg-white/5 hover:text-destructive"
+              className="justify-start gap-3 text-sidebar-muted hover:bg-[var(--sidebar-hover)] hover:text-destructive"
             >
               <LogOut className="h-4 w-4" />
               <span>Salir</span>
@@ -188,6 +184,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
 }
 
 export default function AppLayout() {
+  const { palette } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('neoorders.sidebar') === 'collapsed';
   });
@@ -197,7 +194,9 @@ export default function AppLayout() {
   }, [collapsed]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <>
+      <CommandPalette />
+      <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <aside
         className={`hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-all duration-300 md:block ${
@@ -209,6 +208,7 @@ export default function AppLayout() {
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-muted shadow-md transition-colors hover:text-sidebar-foreground"
+            aria-label={collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
           >
             {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
           </button>
@@ -220,7 +220,7 @@ export default function AppLayout() {
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="bg-background/80 backdrop-blur">
-              <Menu className="h-4 w-4" />
+              <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0">
@@ -229,16 +229,27 @@ export default function AppLayout() {
         </Sheet>
       </div>
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="relative flex-1 overflow-y-auto">
+        {palette === 'clean' && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+          >
+            <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-black/[0.03] blur-3xl dark:bg-white/[0.03]" />
+            <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-black/[0.02] blur-3xl dark:bg-white/[0.02]" />
+          </div>
+        )}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="min-h-full p-4 pt-16 md:p-6 md:pt-6"
+          className="relative flex min-h-full w-full flex-col p-4 pt-16 md:p-5 md:pt-4"
         >
           <Outlet />
         </motion.div>
       </main>
+      <HelpButton />
     </div>
+    </>
   );
 }

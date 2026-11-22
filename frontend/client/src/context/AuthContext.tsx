@@ -13,22 +13,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function toUser(data: any): User {
+  return {
+    id: data.id,
+    email: data.email,
+    nombre: data.nombre,
+    apellido: data.apellido,
+    avatar: data.avatar,
+    tema: data.tema,
+    paleta: data.paleta,
+    roles: data.roles,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = async () => {
     try {
-      const data = await api.me();
-      setUser({
-        id: data.id,
-        email: data.email,
-        nombre: data.nombre,
-        apellido: data.apellido,
-        avatar: data.avatar,
-        tema: data.tema,
-        roles: data.roles,
-      });
+      setUser(toUser(await api.me()));
     } catch {
       setUser(null);
     }
@@ -39,16 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const data = await api.login(email, password);
-    setUser({
-      id: data.id,
-      email: data.email,
-      nombre: data.nombre,
-      apellido: data.apellido,
-      avatar: data.avatar,
-      tema: data.tema,
-      roles: data.roles,
-    });
+    setUser(toUser(await api.login(email, password)));
   };
 
   const logout = async () => {

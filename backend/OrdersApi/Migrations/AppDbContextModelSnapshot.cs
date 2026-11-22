@@ -200,6 +200,10 @@ namespace OrdersApi.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("Paleta")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
@@ -299,6 +303,55 @@ namespace OrdersApi.Migrations
                     b.ToTable("CompanySettings");
                 });
 
+            modelBuilder.Entity("OrdersApi.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Accion")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("EntidadId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("Mensaje")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("Usuario")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fecha");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("OrdersApi.Models.Order", b =>
                 {
                     b.Property<int>("Id")
@@ -320,6 +373,10 @@ namespace OrdersApi.Migrations
 
                     b.Property<DateTime>("Fecha")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("OrderNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<decimal>("PrecioUnitario")
                         .HasPrecision(18, 2)
@@ -343,6 +400,10 @@ namespace OrdersApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique()
+                        .HasFilter("[OrderNumber] IS NOT NULL");
 
                     b.HasIndex("ProductId");
 
@@ -377,6 +438,14 @@ namespace OrdersApi.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ImagePublicId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("MinStockAlert")
                         .HasColumnType("int");

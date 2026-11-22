@@ -7,9 +7,24 @@
     <title>NeoOrders</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#eef4ec" />
     <script>
-      (function(){var t=localStorage.getItem('neoorders.theme')||'claro';var r=t==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'oscuro':'claro'):t;document.documentElement.setAttribute('data-theme',r);})();
+      (function(){
+        var t=localStorage.getItem('neoorders.theme')||'claro';
+        var p=localStorage.getItem('neoorders.palette');
+        var r=t==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'oscuro':'claro'):t;
+        var el=document.documentElement;
+        el.setAttribute('data-theme',r);
+        if(p==='coral'||p==='menta'||p==='clean') el.setAttribute('data-palette',p);
+        el.classList.toggle('dark',r==='oscuro');
+        var meta=document.querySelector('meta[name="theme-color"]');
+        if(meta) {
+          var dark = p==='clean' ? '#0b1512' : '#09090b';
+          var light = p==='clean' ? '#eef4ec' : '#f7f7f5';
+          meta.setAttribute('content', r==='oscuro' ? dark : light);
+        }
+      })();
     </script>
   </head>
   <body>

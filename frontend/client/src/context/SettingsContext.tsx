@@ -1,75 +1,65 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../api';
+import { useAuth } from './AuthContext';
 import type { CompanySettings } from '../types';
 
 interface SettingsContextType {
   company: CompanySettings | null;
-  loading: boolean;
   refresh: () => Promise<void>;
   update: (data: Partial<CompanySettings>) => Promise<void>;
   formatMoney: (amountInArs: number) => string;
-  toDisplay: (amountInArs: number) => number;
-  toArs: (displayAmount: number) => number;
-  currencySymbol: string;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+function toCompany(data: any): CompanySettings {
+  return {
+    id: data.id,
+    nombreEmpresa: data.nombreEmpresa,
+  };
+}
+
+// Todos los montos del sistema se manejan en pesos argentinos.
+const money = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS',
+  maximumFractionDigits: 2,
+});
+
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [company, setCompany] = useState<CompanySettings | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const refresh = async () => {
     try {
-      const data = await api.config.empresa.get();
-      setCompany({
-        id: data.id,
-        nombreEmpresa: data.nombreEmpresa,
-        moneda: data.moneda,
-        tipoDeCambio: data.tipoDeCambio,
-      });
+      setCompany(toCompany(await api.config.empresa.get()));
     } catch {
-      setCompany({ nombreEmpresa: 'NeoOrders', moneda: 'ARS', tipoDeCambio: 1 });
+      setCompany({ nombreEmpresa: 'NeoOrders' });
     }
   };
 
+  // Refetch when the session changes: on the login page the request is
+  // unauthenticated, so the company would otherwise stay on the fallback.
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
-  }, []);
+    void refresh();
+  }, [user?.id]);
 
   const update = async (data: Partial<CompanySettings>) => {
     const res = await api.config.empresa.update({ ...company, ...data });
-    setCompany({
-      id: res.id,
-      nombreEmpresa: res.nombreEmpresa,
-      moneda: res.moneda,
-      tipoDeCambio: res.tipoDeCambio,
-    });
+    setCompany(toCompany(res));
   };
 
-  const currency = company?.moneda || 'ARS';
-  const rate = company?.tipoDeCambio || 1;
-  const currencySymbol = currency === 'USD' ? 'US$' : '$';
-
-  const toDisplay = (amountInArs: number) => (currency === 'USD' ? amountInArs / rate : amountInArs);
-  const toArs = (displayAmount: number) => (currency === 'USD' ? displayAmount * rate : displayAmount);
-
   const formatMoney = (amountInArs: number) => {
-    const value = toDisplay(amountInArs);
     try {
-      return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-AR', {
-        style: 'currency',
-        currency: currency === 'USD' ? 'USD' : 'ARS',
-        maximumFractionDigits: 2,
-      }).format(value);
+      return money.format(amountInArs);
     } catch {
-      return `${currencySymbol} ${value.toLocaleString()}`;
+      return `$ ${amountInArs.toLocaleString('es-AR')}`;
     }
   };
 
   return (
-    <SettingsContext.Provider value={{ company, loading, refresh, update, formatMoney, toDisplay, toArs, currencySymbol }}>
+    <SettingsContext.Provider value={{ company, refresh, update, formatMoney }}>
       {children}
     </SettingsContext.Provider>
   );

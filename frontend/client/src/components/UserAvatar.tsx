@@ -1,0 +1,57 @@
+import Avatar, { genConfig } from 'react-nice-avatar';
+import { useTheme } from '../context/ThemeContext';
+import { cn } from '@/lib/utils';
+
+/** Cantidad de avatares prediseñados disponibles (claves avatar-1 … avatar-N). */
+export const AVATAR_COUNT = 12;
+
+/** Claves estables para el selector y los formularios. */
+export const AVATAR_KEYS = Array.from({ length: AVATAR_COUNT }, (_, i) => `avatar-${i + 1}`);
+
+function avatarSeed(avatar?: string): string {
+  const n = Number.parseInt((avatar || 'avatar-1').replace('avatar-', ''), 10);
+  const index = Number.isFinite(n) ? Math.min(Math.max(n, 1), AVATAR_COUNT) : 1;
+  return `neoorders-person-${index}`;
+}
+
+interface UserAvatarProps {
+  avatar?: string;
+  size?: number;
+  className?: string;
+  /** Fuerza el fondo del avatar; por defecto se adapta a la paleta activa. */
+  bgColor?: string;
+}
+
+export default function UserAvatar({ avatar, size = 36, className, bgColor }: UserAvatarProps) {
+  const { palette, resolved } = useTheme();
+  const isDark = resolved === 'oscuro';
+
+  const fallbackBg =
+    bgColor ??
+    (palette === 'clean'
+      ? isDark
+        ? '#3f3f46'
+        : '#d4d4d8'
+      : palette === 'menta'
+        ? isDark
+          ? '#17332b'
+          : '#e5f1d4'
+        : isDark
+          ? '#2b2028'
+          : '#ffe4e6');
+
+  const config = {
+    ...genConfig(avatarSeed(avatar)),
+    bgColor: fallbackBg,
+    isGradient: false,
+  };
+
+  return (
+    <Avatar
+      shape="circle"
+      className={cn('shrink-0', className)}
+      style={{ width: size, height: size }}
+      {...config}
+    />
+  );
+}

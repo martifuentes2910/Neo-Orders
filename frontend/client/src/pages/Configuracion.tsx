@@ -1,60 +1,66 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import AvatarMemphis from '@/components/AvatarMemphis';
-import { AVATAR_COUNT } from '@/components/AvatarMemphis';
+import UserAvatar, { AVATAR_KEYS } from '@/components/UserAvatar';
 import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
 import { api } from '../api';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Save, User, Building2, Coins, Users, Database } from 'lucide-react';
+import { Plus, Trash2, Save, User, Building2, Users, Database, Palette, Check, AlertTriangle, LifeBuoy, Mail, MessageCircle, Clock, Bug, Copy, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TableHead } from '@/components/ui/table';
+import SortableTableHead from '@/components/SortableTableHead';
+import { useTableSort } from '@/hooks/useTableSort';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-
-// AVATARS replaced by AvatarMemphis presets
+import { PALETTES, type PaletteId } from '../types';
+import { cn } from '@/lib/utils';
 
 export default function Configuracion({ tab }: { tab?: string }) {
   const { user, refresh } = useAuth();
   const { mode, setMode } = useTheme();
   const { company, update: updateCompany } = useSettings();
+  const [searchParams] = useSearchParams();
   const isAdmin = user?.roles?.includes('Admin');
 
-  const [active, setActive] = useState(tab || 'perfil');
-  useEffect(() => { if (tab) setActive(tab); }, [tab]);
+  const requested = tab || searchParams.get('tab') || 'perfil';
+  const [active, setActive] = useState(requested);
+  useEffect(() => { setActive(requested); }, [requested]);
 
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
-        <p className="text-sm text-muted-foreground">Ajustes de perfil, empresa y sistema.</p>
+        <h1 className="text-[32px] font-bold tracking-tight">Configuración</h1>
+        <p className="text-sm text-muted-foreground">Ajustes de perfil, apariencia, empresa y sistema.</p>
       </motion.div>
 
       <Tabs value={active} onValueChange={setActive} className="space-y-4">
         <TabsList>
           <TabsTrigger value="perfil" className="gap-2"><User className="h-4 w-4" /> Perfil</TabsTrigger>
-          <TabsTrigger value="empresa" className="gap-2"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
-          <TabsTrigger value="moneda" className="gap-2"><Coins className="h-4 w-4" /> Moneda</TabsTrigger>
+          <TabsTrigger value="apariencia" className="gap-2"><Palette className="h-4 w-4" /> Apariencia</TabsTrigger>
+          {isAdmin && <TabsTrigger value="empresa" className="gap-2"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>}
           {isAdmin && <TabsTrigger value="usuarios" className="gap-2"><Users className="h-4 w-4" /> Usuarios</TabsTrigger>}
           {isAdmin && <TabsTrigger value="datos" className="gap-2"><Database className="h-4 w-4" /> Datos</TabsTrigger>}
+          <TabsTrigger value="soporte" className="gap-2"><LifeBuoy className="h-4 w-4" /> Soporte</TabsTrigger>
         </TabsList>
 
         <TabsContent value="perfil">
-          <Card><CardContent className="p-6"><PerfilTab user={user} refresh={refresh} mode={mode} setMode={setMode} /></CardContent></Card>
+          <Card><CardContent className="p-6"><PerfilTab user={user} refresh={refresh} /></CardContent></Card>
+        </TabsContent>
+        <TabsContent value="apariencia">
+          <Card><CardContent className="p-6"><AparienciaTab mode={mode} setMode={setMode} /></CardContent></Card>
         </TabsContent>
         {isAdmin && (
           <>
             <TabsContent value="empresa">
               <Card><CardContent className="p-6"><EmpresaTab company={company} update={updateCompany} /></CardContent></Card>
-            </TabsContent>
-            <TabsContent value="moneda">
-              <Card><CardContent className="p-6"><MonedaTab company={company} update={updateCompany} /></CardContent></Card>
             </TabsContent>
             <TabsContent value="usuarios">
               <Card><CardContent className="p-6"><UsuariosTab /></CardContent></Card>
@@ -64,12 +70,15 @@ export default function Configuracion({ tab }: { tab?: string }) {
             </TabsContent>
           </>
         )}
+        <TabsContent value="soporte">
+          <Card><CardContent className="p-6"><SoporteTab /></CardContent></Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function PerfilTab({ user, refresh, mode, setMode }: any) {
+function PerfilTab({ user, refresh }: any) {
   const [form, setForm] = useState({ nombre: user?.nombre || '', apellido: user?.apellido || '', avatar: user?.avatar || 'avatar-1' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -78,7 +87,7 @@ function PerfilTab({ user, refresh, mode, setMode }: any) {
     setSaving(true);
     setMsg(null);
     try {
-      await api.config.perfil.update({ ...form, tema: mode });
+      await api.config.perfil.update(form);
       await refresh();
       setMsg('Perfil actualizado');
       toast.success('Perfil actualizado');
@@ -104,29 +113,23 @@ function PerfilTab({ user, refresh, mode, setMode }: any) {
         </div>
         <div className="sm:col-span-2 grid gap-2">
           <Label>Avatar</Label>
+          <p className="text-xs text-muted-foreground">Elegí uno de los retratos prediseñados.</p>
           <div className="flex flex-wrap gap-3">
-            {Array.from({ length: AVATAR_COUNT }).map((_, i) => {
-              const key = `avatar-${i + 1}`;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setForm({ ...form, avatar: key })}
-                  className={`flex h-14 w-14 items-center justify-center rounded-full transition-all ${form.avatar === key ? 'ring-2 ring-primary ring-offset-2 scale-110' : 'opacity-70 hover:opacity-100 hover:scale-105'}`}
-                >
-                  <AvatarMemphis preset={i} size={56} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="sm:col-span-2 grid gap-2">
-          <Label>Tema</Label>
-          <div className="flex gap-2">
-            {(['claro', 'oscuro', 'auto'] as const).map((t) => (
-              <Button key={t} variant={mode === t ? 'default' : 'outline'} size="sm" onClick={() => setMode(t)}>
-                {t === 'claro' ? 'Claro' : t === 'oscuro' ? 'Oscuro' : 'Automático'}
-              </Button>
+            {AVATAR_KEYS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setForm({ ...form, avatar: key })}
+                aria-label={`Avatar ${key.replace('avatar-', '')}`}
+                className={cn(
+                  'flex h-14 w-14 items-center justify-center rounded-full transition-all',
+                  form.avatar === key
+                    ? 'scale-110 ring-2 ring-primary ring-offset-2 ring-offset-background'
+                    : 'opacity-75 hover:scale-105 hover:opacity-100',
+                )}
+              >
+                <UserAvatar avatar={key} size={56} />
+              </button>
             ))}
           </div>
         </div>
@@ -135,6 +138,128 @@ function PerfilTab({ user, refresh, mode, setMode }: any) {
         <Save className="h-4 w-4" /> {saving ? 'Guardando…' : 'Guardar cambios'}
       </Button>
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+    </div>
+  );
+}
+
+function AparienciaTab({ mode, setMode }: { mode: 'claro' | 'oscuro' | 'auto'; setMode: (m: 'claro' | 'oscuro' | 'auto') => void }) {
+  const { palette, setPalette, resolved } = useTheme();
+
+  const choose = (id: PaletteId) => {
+    setPalette(id);
+    const nombre = PALETTES.find((p) => p.id === id)?.nombre ?? id;
+    toast.success(`Paleta ${nombre} activada`);
+  };
+
+  const previewFor = (id: PaletteId) => {
+    if (id === 'clean') {
+      return resolved === 'oscuro'
+        ? { canvas: '#0a0a0a', sidebar: '#141414', card: '#171717', line: '#2e2e2e', accent: '#a7e36a', text: '#f5f5f5', glass: true }
+        : { canvas: '#eef4ec', sidebar: '#ffffff', card: '#ffffff', line: '#d7e2d4', accent: '#8fd14f', text: '#101915', glass: true };
+    }
+    if (id === 'menta') {
+      return resolved === 'oscuro'
+        ? { canvas: '#0A1F1A', sidebar: '#0B2E27', card: '#102A23', line: '#1D3B32', accent: '#35C0A3', text: '#E5F1D4', glass: false }
+        : { canvas: '#F7FAF0', sidebar: '#FFFFFF', card: '#FFFFFF', line: '#DCEBD3', accent: '#35C0A3', text: '#0E4D41', glass: false };
+    }
+    return resolved === 'oscuro'
+      ? { canvas: '#0d0f14', sidebar: '#0a0c10', card: '#1a1d26', line: '#262a3b', accent: '#ff5c7a', text: '#e8eaf0', glass: false }
+      : { canvas: '#f7f1ec', sidebar: '#0e1017', card: '#ffffff', line: '#e8e5df', accent: '#ff5c7a', text: '#131418', glass: false };
+  };
+
+  return (
+    <div className="space-y-8">
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold">Paleta de colores</h3>
+          <p className="text-sm text-muted-foreground">
+            La preferencia es personal: se guarda en tu usuario y no afecta a los demás.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {PALETTES.map((p) => {
+            const active = palette === p.id;
+            const preview = previewFor(p.id);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => choose(p.id)}
+                aria-pressed={active}
+                className={cn(
+                  'rounded-2xl border p-4 text-left transition-all hover:shadow-md',
+                  active ? 'border-primary ring-2 ring-primary/40' : 'border-border',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-semibold">
+                      {p.nombre}
+                      {active && <Check className="h-4 w-4 text-primary" />}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{p.descripcion}</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  {p.swatches.map((color) => (
+                    <span
+                      key={color}
+                      className="h-6 flex-1 rounded-full border border-black/5"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+
+                <div
+                  className="mt-3 flex h-20 overflow-hidden rounded-xl border"
+                  style={{ backgroundColor: preview.canvas, borderColor: preview.line }}
+                >
+                  <div className="flex w-1/4 flex-col gap-1 p-2" style={{ backgroundColor: preview.sidebar }}>
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="h-1.5 rounded-full"
+                        style={{ backgroundColor: i === 0 ? preview.accent : preview.line, width: i === 0 ? '90%' : '70%' }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1.5 p-2">
+                    <span className="h-2 w-1/2 rounded-full" style={{ backgroundColor: preview.text, opacity: 0.7 }} />
+                    <span
+                      className="h-6 rounded-md"
+                      style={{
+                        backgroundColor: preview.glass ? `${preview.card}99` : preview.card,
+                        border: `1px solid ${preview.line}`,
+                        backdropFilter: preview.glass ? 'blur(6px)' : undefined,
+                      }}
+                    />
+                    <span className="h-2 w-2/3 rounded-full" style={{ backgroundColor: preview.accent, opacity: 0.8 }} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold">Modo de color</h3>
+          <p className="text-sm text-muted-foreground">
+            Claro, oscuro o automático según el sistema. También se guarda en tu usuario.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(['claro', 'oscuro', 'auto'] as const).map((t) => (
+            <Button key={t} variant={mode === t ? 'default' : 'outline'} size="sm" onClick={() => setMode(t)}>
+              {t === 'claro' ? 'Claro' : t === 'oscuro' ? 'Oscuro' : 'Automático'}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">Modo activo ahora: {resolved === 'oscuro' ? 'oscuro' : 'claro'}.</p>
+      </section>
     </div>
   );
 }
@@ -166,63 +291,10 @@ function EmpresaTab({ company, update }: any) {
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold">Datos de la empresa</h3>
+      <p className="text-sm text-muted-foreground">Los montos del sistema se muestran siempre en pesos argentinos (ARS).</p>
       <div className="grid gap-2">
         <Label>Nombre de la empresa</Label>
         <Input value={form.nombreEmpresa} onChange={(e) => setForm({ ...form, nombreEmpresa: e.target.value })} />
-      </div>
-      <Button onClick={save} disabled={saving} className="gap-2">
-        <Save className="h-4 w-4" /> {saving ? 'Guardando…' : 'Guardar'}
-      </Button>
-      {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-    </div>
-  );
-}
-
-function MonedaTab({ company, update }: any) {
-  const [moneda, setMoneda] = useState(company?.moneda || 'ARS');
-  const [tipo, setTipo] = useState(company?.tipoDeCambio || 1);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMoneda(company?.moneda || 'ARS');
-    setTipo(company?.tipoDeCambio || 1);
-  }, [company]);
-
-  const save = async () => {
-    setSaving(true);
-    setMsg(null);
-    try {
-      await update({ moneda, tipoDeCambio: Number(tipo) });
-      setMsg('Moneda actualizada');
-      toast.success('Moneda actualizada');
-    } catch (e: any) {
-      setMsg(e.message);
-      toast.error(e.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <h3 className="text-lg font-semibold">Configuración de moneda</h3>
-      <p className="text-sm text-muted-foreground">Los montos se almacenan en pesos argentinos (ARS). Podés mostrarlos en USD usando el tipo de cambio.</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label>Moneda de visualización</Label>
-          <Select value={moneda} onValueChange={setMoneda}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ARS">Pesos argentinos (ARS)</SelectItem>
-              <SelectItem value="USD">Dólares (USD)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-2">
-          <Label>Tipo de cambio (ARS por 1 USD)</Label>
-          <Input type="number" step="0.01" min={0.01} value={tipo} onChange={(e) => setTipo(Number(e.target.value))} />
-        </div>
       </div>
       <Button onClick={save} disabled={saving} className="gap-2">
         <Save className="h-4 w-4" /> {saving ? 'Guardando…' : 'Guardar'}
@@ -238,6 +310,12 @@ function UsuariosTab() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', nombre: '', apellido: '', avatar: 'avatar-1', rol: 'Empleado' });
   const [saving, setSaving] = useState(false);
+
+  const { sorted, sort, toggle } = useTableSort(users, {
+    email: (u) => u.email,
+    nombre: (u) => `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim(),
+    rol: (u) => (u.roles ?? []).join(', '),
+  });
 
   const load = async () => {
     setLoading(true);
@@ -282,17 +360,22 @@ function UsuariosTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Rol</th>
-                <th className="px-4 py-3">Acciones</th>
+                <SortableTableHead label="Email" sortKey="email" sort={sort} onSort={toggle} />
+                <SortableTableHead label="Nombre" sortKey="nombre" sort={sort} onSort={toggle} />
+                <SortableTableHead label="Rol" sortKey="rol" sort={sort} onSort={toggle} />
+                <TableHead className="px-4 py-3">Acciones</TableHead>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {sorted.map((u) => (
                 <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3">{u.email}</td>
-                  <td className="px-4 py-3">{u.nombre} {u.apellido}</td>
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-2">
+                      <UserAvatar avatar={u.avatar} size={28} />
+                      <span>{u.nombre} {u.apellido}</span>
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <Badge variant="secondary">{u.roles?.join(', ')}</Badge>
                   </td>
@@ -333,6 +416,25 @@ function UsuariosTab() {
               </div>
             </div>
             <div className="grid gap-2">
+              <Label>Avatar</Label>
+              <div className="flex flex-wrap gap-2">
+                {AVATAR_KEYS.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setForm({ ...form, avatar: key })}
+                    aria-label={`Avatar ${key.replace('avatar-', '')}`}
+                    className={cn(
+                      'rounded-full transition-all',
+                      form.avatar === key ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'opacity-70 hover:opacity-100',
+                    )}
+                  >
+                    <UserAvatar avatar={key} size={40} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-2">
               <Label>Rol</Label>
               <Select value={form.rol} onValueChange={(v) => setForm({ ...form, rol: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -353,10 +455,108 @@ function UsuariosTab() {
   );
 }
 
+function SoporteTab() {
+  const [copiado, setCopiado] = useState<'email' | 'plantilla' | null>(null);
+  const EMAIL = 'soporte@neoorders.example';
+  const TELEFONO = '+54 11 0000-0000';
+
+  const plantillaBug = () => {
+    const ruta = window.location.pathname;
+    const fecha = new Date().toLocaleString('es-AR');
+    const navegador = navigator.userAgent;
+    return [
+      'Hola equipo de soporte de NeoOrders,',
+      '',
+      'Quiero reportar un problema:',
+      '',
+      `- Ruta: ${ruta}`,
+      '- Rol: [Admin/Empleado]',
+      `- Navegador: ${navegador}`,
+      `- Fecha y hora: ${fecha}`,
+      '- Descripción: [qué pasó]',
+      '- Pasos para reproducir:',
+      '  1. [paso 1]',
+      '  2. [paso 2]',
+      '  3. [paso 3]',
+      '- Resultado esperado: [qué esperabas]',
+      '- Resultado obtenido: [qué pasó realmente]',
+      '',
+      'Gracias.',
+    ].join('\n');
+  };
+
+  const copiar = async (texto: string, tipo: 'email' | 'plantilla') => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(tipo);
+      toast.success(tipo === 'email' ? 'Email copiado' : 'Plantilla copiada');
+      setTimeout(() => setCopiado(null), 1800);
+    } catch {
+      toast.error('No se pudo copiar al portapapeles');
+    }
+  };
+
+  const mailto = `mailto:${EMAIL}?subject=${encodeURIComponent('Reporte de bug - NeoOrders')}&body=${encodeURIComponent(plantillaBug())}`;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold">Soporte y contacto</h3>
+        <p className="text-sm text-muted-foreground">
+          Canales de contacto y guía para reportar problemas o consultas sobre NeoOrders.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
+          <p className="flex items-center gap-2 font-medium"><Mail className="h-4 w-4" /> Email</p>
+          <p className="text-sm text-muted-foreground">{EMAIL}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => copiar(EMAIL, 'email')}>
+              {copiado === 'email' ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar
+            </Button>
+            <Button asChild size="sm" className="gap-2"><a href={`mailto:${EMAIL}`}><Mail className="h-4 w-4" /> Escribir</a></Button>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
+          <p className="flex items-center gap-2 font-medium"><MessageCircle className="h-4 w-4" /> Teléfono</p>
+          <p className="text-sm text-muted-foreground">{TELEFONO}</p>
+          <p className="text-xs text-muted-foreground">Contacto rápido en horario laboral.</p>
+        </div>
+        <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
+          <p className="flex items-center gap-2 font-medium"><Clock className="h-4 w-4" /> Horario</p>
+          <p className="text-sm text-muted-foreground">Lunes a viernes<br />09:00 a 18:00 (ART)</p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-muted/10 p-4 space-y-4">
+        <p className="flex items-center gap-2 font-medium"><Bug className="h-4 w-4" /> Reportar un bug</p>
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+          <li>Indicá la ruta/pantalla donde ocurrió (por ejemplo, <code>/pedidos</code>).</li>
+          <li>Describí qué esperabas que pase y qué pasó realmente.</li>
+          <li>Agregá pasos para reproducirlo, tu rol y la fecha/hora.</li>
+          <li>Si podés, adjuntá una captura al enviar el correo.</li>
+        </ol>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild className="gap-2"><a href={mailto}><Mail className="h-4 w-4" /> Reportar por email</a></Button>
+          <Button variant="outline" className="gap-2" onClick={() => copiar(plantillaBug(), 'plantilla')}>
+            {copiado === 'plantilla' ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar plantilla
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DatosTab() {
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const run = async () => {
+  const [clearing, setClearing] = useState(false);
+  const [showClear, setShowClear] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const busy = loading || clearing;
+
+  const runSeed = async () => {
     setLoading(true);
     setMsg(null);
     try {
@@ -370,14 +570,89 @@ function DatosTab() {
       setLoading(false);
     }
   };
+
+  const runClear = async () => {
+    setClearing(true);
+    setMsg(null);
+    try {
+      const r = await api.config.clear();
+      const e = r.eliminados ?? {};
+      const resumen = `Eliminados: ${e.notificaciones ?? 0} notificaciones, ${e.pedidos ?? 0} pedidos, ${e.productos ?? 0} productos, ${e.vendedores ?? 0} vendedores y ${e.clientes ?? 0} clientes.`;
+      setMsg(resumen);
+      toast.success(r.message || 'Datos operativos eliminados');
+      setShowClear(false);
+      setConfirmText('');
+      window.setTimeout(() => window.location.reload(), 1200);
+    } catch (err: any) {
+      setMsg(err.message);
+      toast.error(err.message);
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Datos de ejemplo</h3>
-      <p className="text-sm text-muted-foreground">Verifica y carga datos de ejemplo (clientes, pedidos) si la base está vacía.</p>
-      <Button onClick={run} disabled={loading} className="gap-2">
-        <Database className="h-4 w-4" /> {loading ? 'Procesando…' : 'Cargar datos de ejemplo'}
-      </Button>
+      <div>
+        <h3 className="text-lg font-semibold">Datos de ejemplo</h3>
+        <p className="text-sm text-muted-foreground">Verifica y carga datos de ejemplo (clientes, pedidos) si la base está vacía.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={runSeed} disabled={busy} className="gap-2">
+          <Database className="h-4 w-4" /> {loading ? 'Procesando…' : 'Cargar datos de ejemplo'}
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={() => { setMsg(null); setConfirmText(''); setShowClear(true); }}
+          disabled={busy}
+          className="gap-2"
+        >
+          <Trash2 className="h-4 w-4" /> Eliminar todos los datos
+        </Button>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        La eliminación afecta sólo a los datos operativos. Los usuarios, los roles y la configuración de empresa se conservan.
+      </p>
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+
+      <Dialog open={showClear} onOpenChange={(open) => { setShowClear(open); if (!open) setConfirmText(''); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Eliminar todos los datos
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Esta acción no puede deshacerse. Se borrarán pedidos, clientes, productos, vendedores y notificaciones.
+              Los usuarios, los roles y la configuración de empresa se conservan.
+            </p>
+            <div className="grid gap-2">
+              <Label htmlFor="confirmar-eliminacion">Escribí <strong>ELIMINAR</strong> para confirmar</Label>
+              <Input
+                id="confirmar-eliminacion"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="ELIMINAR"
+                autoComplete="off"
+                disabled={clearing}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClear(false)} disabled={clearing}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={runClear}
+              disabled={confirmText.trim() !== 'ELIMINAR' || clearing}
+            >
+              {clearing ? 'Eliminando…' : 'Eliminar datos'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

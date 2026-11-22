@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="NeoOrders">
+  <rect x="2" y="2" width="44" height="44" rx="13" fill="none" stroke="#131418" stroke-width="2"/>
+  <rect x="11" y="12" width="6.5" height="24" rx="3.25" fill="#131418"/>
+  <path d="M17.5 13.5 L31 33" stroke="#131418" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+  <rect x="31" y="12" width="6.5" height="24" rx="3.25" fill="#131418"/>
+  <circle cx="34.25" cy="12" r="4.6" fill="#131418"/>
+  <path d="M31.8 12 L33.5 13.7 L36.7 10.2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

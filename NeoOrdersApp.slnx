@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/backend/" />
+  <Folder Name="/backend/src/">
+    <Project Path="backend/src/NeoOrders.Api/NeoOrders.Api.csproj" />
+    <Project Path="backend/src/NeoOrders.Application/NeoOrders.Application.csproj" />
+    <Project Path="backend/src/NeoOrders.Domain/NeoOrders.Domain.csproj" />
+    <Project Path="backend/src/NeoOrders.Infrastructure/NeoOrders.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/backend/tests/">
+    <Project Path="backend/tests/NeoOrders.Application.Tests/NeoOrders.Application.Tests.csproj" />
+    <Project Path="backend/tests/NeoOrders.Architecture.Tests/NeoOrders.Architecture.Tests.csproj" />
+    <Project Path="backend/tests/NeoOrders.Domain.Tests/NeoOrders.Domain.Tests.csproj" />
+  </Folder>
+  <Project Path="backend/OrdersApi/OrdersApi.csproj" />
+</Solution>
