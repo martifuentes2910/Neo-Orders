@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OrdersApi.Models;
+using NeoOrders.Domain.Orders;
 
 namespace OrdersApi.Data;
 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OrdersApi.Application.Contracts.Reportes;
 using OrdersApi.Application.DTOs.Reportes;
 using OrdersApi.Models;
+using NeoOrders.Domain.Orders;
 
 namespace OrdersApi.Data.Repositories.Reportes;
 

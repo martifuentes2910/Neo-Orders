@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OrdersApi.Data;
 using OrdersApi.Models;
+using NeoOrders.Domain.Orders;
 
 namespace OrdersApi.Services;
 

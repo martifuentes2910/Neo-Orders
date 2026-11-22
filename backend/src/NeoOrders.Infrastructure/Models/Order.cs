@@ -1,35 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using NeoOrders.Domain.Orders;
 
 namespace OrdersApi.Models;
-
-public static class OrderStatuses
-{
-    public const string Pendiente = "Pendiente";
-    public const string Procesado = "Procesado";
-    public const string Enviado = "Enviado";
-    public const string Entregado = "Entregado";
-    public const string Cancelado = "Cancelado";
-
-    public static readonly string[] All = { Pendiente, Procesado, Enviado, Entregado, Cancelado };
-
-    // KAN-16/KAN-35: estados con datos fijos; sólo se permite cambiar el estado por PATCH.
-    public static readonly HashSet<string> EditLocked = new() { Procesado, Enviado, Entregado, Cancelado };
-
-    // KAN-16/KAN-35: transiciones de negocio. El mismo estado se acepta como no-op.
-    public static readonly IReadOnlyDictionary<string, string[]> Transitions =
-        new Dictionary<string, string[]>
-        {
-            [Pendiente] = new[] { Procesado, Cancelado },
-            [Procesado] = new[] { Enviado, Cancelado },
-            [Enviado] = new[] { Entregado },
-            [Entregado] = Array.Empty<string>(),
-            [Cancelado] = Array.Empty<string>(),
-        };
-
-    public static bool CanTransition(string from, string to) =>
-        from == to || (Transitions.TryGetValue(from, out var allowed) && allowed.Contains(to));
-}
 
 public class Order
 {

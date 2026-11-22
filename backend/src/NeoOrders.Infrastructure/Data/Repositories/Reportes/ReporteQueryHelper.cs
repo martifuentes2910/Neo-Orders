@@ -2,6 +2,7 @@ using OrdersApi.Application.Contracts.Reportes;
 using OrdersApi.Models;
 
 using OrdersApi.Application.DTOs.Reportes;
+using NeoOrders.Domain.Orders;
 namespace OrdersApi.Data.Repositories.Reportes;
 
 /// <summary>Filtros y exclusiones compartidos por todos los repositorios de reportes.</summary>
