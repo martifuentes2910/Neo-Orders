@@ -39,4 +39,23 @@ public class DependencyRulesTests
 
         Assert.True(result.IsSuccessful);
     }
+
+    [Fact]
+    public void Domain_ProjectFile_ShouldNotReferenceEfOrAspNetOrIdentity()
+    {
+        var root = FindRepoRoot();
+        var csproj = File.ReadAllText(Path.Combine(root, "backend", "src", "NeoOrders.Domain", "NeoOrders.Domain.csproj"));
+        Assert.DoesNotContain("EntityFramework", csproj);
+        Assert.DoesNotContain("AspNetCore", csproj);
+        Assert.DoesNotContain("Identity", csproj);
+        Assert.DoesNotContain("PackageReference", csproj);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "NeoOrdersApp.slnx")))
+            dir = dir.Parent;
+        return dir?.FullName ?? throw new DirectoryNotFoundException("Repo root not found");
+    }
 }
