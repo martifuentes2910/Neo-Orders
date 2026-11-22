@@ -22,9 +22,9 @@ public sealed class CsvImportService : ICsvImportService
         _db = db;
     }
 
-    public async Task<CsvImportResultDto> ImportClientsAsync(IFormFile file, CancellationToken ct = default)
+    public async Task<CsvImportResultDto> ImportClientsAsync(Stream csvStream, CancellationToken ct = default)
     {
-        var (rows, errors) = await ReadRowsAsync(file, ClientHeaders, ct);
+        var (rows, errors) = await ReadRowsAsync(csvStream, ClientHeaders, ct);
         var result = new CsvImportResultDto { TotalRows = rows.Count, Errors = errors };
         if (errors.Count > 0) return result;
 
@@ -96,9 +96,9 @@ public sealed class CsvImportService : ICsvImportService
         return result;
     }
 
-    public async Task<CsvImportResultDto> ImportProductsAsync(IFormFile file, CancellationToken ct = default)
+    public async Task<CsvImportResultDto> ImportProductsAsync(Stream csvStream, CancellationToken ct = default)
     {
-        var (rows, errors) = await ReadRowsAsync(file, ProductHeaders, ct);
+        var (rows, errors) = await ReadRowsAsync(csvStream, ProductHeaders, ct);
         var result = new CsvImportResultDto { TotalRows = rows.Count, Errors = errors };
         if (errors.Count > 0) return result;
 
@@ -189,9 +189,9 @@ public sealed class CsvImportService : ICsvImportService
         return result;
     }
 
-    public async Task<CsvImportResultDto> ImportOrdersAsync(IFormFile file, CancellationToken ct = default)
+    public async Task<CsvImportResultDto> ImportOrdersAsync(Stream csvStream, CancellationToken ct = default)
     {
-        var (rows, errors) = await ReadRowsAsync(file, OrderHeaders, ct);
+        var (rows, errors) = await ReadRowsAsync(csvStream, OrderHeaders, ct);
         var result = new CsvImportResultDto { TotalRows = rows.Count, Errors = errors };
         if (errors.Count > 0) return result;
 
@@ -312,33 +312,36 @@ public sealed class CsvImportService : ICsvImportService
     }
 
     private static async Task<(List<Dictionary<string, string>> Rows, List<CsvImportErrorDto> Errors)> ReadRowsAsync(
-        IFormFile file, string[] expectedHeaders, CancellationToken ct)
+        Stream csvStream, string[] expectedHeaders, CancellationToken ct)
     {
         var errors = new List<CsvImportErrorDto>();
-        if (file == null || file.Length == 0)
+        if (csvStream == null)
         {
             errors.Add(Err(0, "file", "", "Debe seleccionar un archivo CSV."));
             return ([], errors);
         }
-        if (file.Length > MaxBytes)
+        if (csvStream.CanSeek && csvStream.Length == 0)
+        {
+            errors.Add(Err(0, "file", "", "Debe seleccionar un archivo CSV."));
+            return ([], errors);
+        }
+        if (csvStream.CanSeek && csvStream.Length > MaxBytes)
         {
             errors.Add(Err(0, "file", "", "El archivo supera el límite de 2 MB."));
             return ([], errors);
         }
 
-        var ext = Path.GetExtension(file.FileName);
-        if (!string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
-        {
-            errors.Add(Err(0, "file", file.FileName, "El archivo debe tener extensión .csv."));
-            return ([], errors);
-        }
 
         List<List<string>> parsed;
         try
         {
-            using var stream = file.OpenReadStream();
-            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            using var reader = new StreamReader(csvStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
             var content = await reader.ReadToEndAsync(ct);
+            if (Encoding.UTF8.GetByteCount(content) > MaxBytes)
+            {
+                errors.Add(new CsvImportErrorDto { Row = 0, Field = "archivo", Value = string.Empty, Message = "El archivo no puede superar 2 MB." });
+                return ([], errors);
+            }
             parsed = ParseCsv(content, ';');
         }
         catch (Exception)

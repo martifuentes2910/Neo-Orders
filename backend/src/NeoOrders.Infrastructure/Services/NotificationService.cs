@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity;
 using OrdersApi.Data;
 using OrdersApi.Models;
