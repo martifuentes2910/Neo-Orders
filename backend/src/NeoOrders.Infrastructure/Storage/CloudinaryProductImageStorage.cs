@@ -2,6 +2,7 @@ using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
 using OrdersApi.Application.Contracts.Productos;
 
+using Microsoft.Extensions.Logging;
 namespace OrdersApi.Infrastructure.Storage;
 
 /// <summary>Sube y borra imágenes en Cloudinary. Las credenciales se inyectan desde configuración/secretos.</summary>

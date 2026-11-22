@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-
 namespace OrdersApi.Application.Services;
 
 /// <summary>Validación de imágenes de producto: extensión, content-type, tamaño y firma del archivo.</summary>
@@ -24,17 +22,17 @@ public static class ProductImageValidator
     };
 
     /// <summary>Devuelve null cuando el archivo es válido; si no, el mensaje para el cliente.</summary>
-    public static string? Validate(IFormFile file, byte[] content)
+    public static string? Validate(string fileName, string? contentType, byte[] content)
     {
         if (content.Length == 0) return "Debe seleccionar una imagen.";
         if (content.Length > MaxBytes) return "La imagen no puede superar los 2 MB.";
 
-        var extension = Path.GetExtension(file.FileName);
+        var extension = Path.GetExtension(fileName);
         if (!FormatosPorExtension.TryGetValue(extension, out var formatoExtension))
             return "Formato no admitido. Use JPG, PNG o WebP.";
 
-        var contentType = (file.ContentType ?? string.Empty).Trim();
-        if (!FormatosPorContentType.TryGetValue(contentType, out var formatoContentType))
+        var normalizedContentType = (contentType ?? string.Empty).Trim();
+        if (!FormatosPorContentType.TryGetValue(normalizedContentType, out var formatoContentType))
             return "Tipo de archivo no admitido. Use JPG, PNG o WebP.";
 
         var formatoReal = DetectarFormato(content);

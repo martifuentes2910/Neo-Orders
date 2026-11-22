@@ -24,7 +24,8 @@ builder.Services.AddControllersWithViews(options =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=localhost;Database=OrdersDb;Trusted_Connection=True;TrustServerCertificate=True;";
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(connectionString, sql =>
+        sql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
 // Services
 builder.Services.AddScoped<IOrderService, OrderService>();
