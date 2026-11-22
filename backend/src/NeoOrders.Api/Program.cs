@@ -1,4 +1,177 @@
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using OrdersApi.Services;
+using OrdersApi.Application.Contracts.Productos;
+using OrdersApi.Application.Contracts.Reportes;
+using OrdersApi.Application.Services;
+using OrdersApi.Data;
+using OrdersApi.Data.Repositories.Reportes;
+using OrdersApi.Infrastructure.Storage;
+using OrdersApi.Models;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Services
+builder.Services.AddControllersWithViews(options =>
+{
+    // Validate the antiforgery token on every unsafe request by default.
+    // Login/logout opt out with [IgnoreAntiforgeryToken].
+    options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute());
+});
+
+// Database
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Server=localhost;Database=OrdersDb;Trusted_Connection=True;TrustServerCertificate=True;";
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(connectionString));
+
+// Services
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+// Reportes: contratos en Application, implementaciones en Data (DIP).
+builder.Services.AddScoped<IReporteResumenRepository, ReporteResumenRepository>();
+builder.Services.AddScoped<IDashboardMetricsRepository, DashboardMetricsRepository>();
+builder.Services.AddScoped<IVentasVendedorRepository, VentasVendedorRepository>();
+builder.Services.AddScoped<IProductosVendidosRepository, ProductosVendidosRepository>();
+builder.Services.AddScoped<IClientesConMasComprasRepository, ClientesConMasComprasRepository>();
+builder.Services.AddScoped<IReporteService, ReporteService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IVentasVendedorService, VentasVendedorService>();
+builder.Services.AddScoped<IProductosVendidosService, ProductosVendidosService>();
+builder.Services.AddScoped<IClientesConMasComprasService, ClientesConMasComprasService>();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<ICsvImportService, CsvImportService>();
+
+// KAN-23: imágenes de producto en Cloudinary. Sin credenciales la app arranca y el CRUD sigue funcionando.
+var cloudName = builder.Configuration["Cloudinary:CloudName"];
+var cloudApiKey = builder.Configuration["Cloudinary:ApiKey"];
+var cloudApiSecret = builder.Configuration["Cloudinary:ApiSecret"];
+var cloudFolder = builder.Configuration["Cloudinary:Folder"] ?? "neoorders/products";
+var cloudinaryConfigured = !string.IsNullOrWhiteSpace(cloudName)
+    && !string.IsNullOrWhiteSpace(cloudApiKey)
+    && !string.IsNullOrWhiteSpace(cloudApiSecret);
+
+if (cloudinaryConfigured)
+{
+    builder.Services.AddSingleton<IProductImageStorage>(sp => new CloudinaryProductImageStorage(
+        cloudName!, cloudApiKey!, cloudApiSecret!, cloudFolder,
+        sp.GetRequiredService<ILogger<CloudinaryProductImageStorage>>()));
+}
+else
+{
+    builder.Services.AddSingleton<IProductImageStorage, UnconfiguredProductImageStorage>();
+}
+
+// Identity
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequiredLength = 6;
+    options.User.RequireUniqueEmail = true;
+    options.SignIn.RequireConfirmedAccount = false;
+})
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
+
+var isDev = builder.Environment.IsDevelopment();
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "NeoOrders.Auth";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = isDev ? SameSiteMode.Lax : SameSiteMode.None;
+    options.Cookie.SecurePolicy = isDev ? CookieSecurePolicy.None : CookieSecurePolicy.Always;
+    options.ExpireTimeSpan = TimeSpan.FromDays(7);
+    options.SlidingExpiration = true;
+    options.Events.OnRedirectToLogin = ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    };
+});
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+    options.Cookie.Name = "NeoOrders.XSRF";
+    options.Cookie.SameSite = isDev ? SameSiteMode.Lax : SameSiteMode.None;
+    options.Cookie.SecurePolicy = isDev ? CookieSecurePolicy.None : CookieSecurePolicy.Always;
+});
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "https://localhost:5173",
+                "http://127.0.0.1:5173",
+                "https://127.0.0.1:5173",
+                "http://localhost:4173",
+                "http://127.0.0.1:4173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+builder.Services.AddOpenApi();
+
 var app = builder.Build();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+if (!cloudinaryConfigured)
+{
+    app.Logger.LogWarning(
+        "Cloudinary no está configurado. Las imágenes de producto no se pueden cargar hasta definir Cloudinary__CloudName, Cloudinary__ApiKey y Cloudinary__ApiSecret.");
+}
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+// Auto-migrate + seed
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try
+    {
+        db.Database.Migrate();
+        await DbSeeder.SeedAsync(scope.ServiceProvider);
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error al migrar/sembrar la base de datos.");
+    }
+}
+
+app.UseCors("AllowFrontend");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.UseAntiforgery();
+
+app.MapControllers();
+
+// Antiforgery token endpoint
+app.MapGet("/api/antiforgery/token", (IAntiforgery antiforgery, HttpContext context) =>
+{
+    var tokens = antiforgery.GetAndStoreTokens(context);
+    return Results.Ok(new { token = tokens.RequestToken });
+}).RequireAuthorization();
+
 app.Run();

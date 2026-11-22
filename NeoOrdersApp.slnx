@@ -11,5 +11,4 @@
     <Project Path="backend/tests/NeoOrders.Architecture.Tests/NeoOrders.Architecture.Tests.csproj" />
     <Project Path="backend/tests/NeoOrders.Domain.Tests/NeoOrders.Domain.Tests.csproj" />
   </Folder>
-  <Project Path="backend/OrdersApi/OrdersApi.csproj" />
 </Solution>
