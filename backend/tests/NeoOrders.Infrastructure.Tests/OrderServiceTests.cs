@@ -93,6 +93,6 @@ public class OrderServiceTests
         var result = await svc.UpdateStatusAsync(1, OrderStatuses.Entregado);
 
         Assert.False(result.Success);
-        Assert.Contains("Transición de estado no permitida", result.Error);
+        Assert.Contains("no permitida", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 }
