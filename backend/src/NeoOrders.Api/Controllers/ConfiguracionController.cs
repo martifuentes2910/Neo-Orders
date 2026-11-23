@@ -32,7 +32,7 @@ public class ConfiguracionController : ControllerBase
     public async Task<IActionResult> GetPerfil()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
+        if (user == null) return Unauthorized(new { message = "No autenticado." });
         return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta });
     }
 
@@ -40,7 +40,7 @@ public class ConfiguracionController : ControllerBase
     public async Task<IActionResult> UpdatePerfil([FromBody] PerfilDto dto)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
+        if (user == null) return Unauthorized(new { message = "No autenticado." });
         if (!string.IsNullOrWhiteSpace(dto.Nombre)) user.Nombre = dto.Nombre;
         if (!string.IsNullOrWhiteSpace(dto.Apellido)) user.Apellido = dto.Apellido;
         if (!string.IsNullOrWhiteSpace(dto.Avatar)) user.Avatar = dto.Avatar;
