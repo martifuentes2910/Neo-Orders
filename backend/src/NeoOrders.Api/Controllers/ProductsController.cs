@@ -27,7 +27,7 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> Get(int id)
     {
         var p = await _products.GetByIdAsync(id);
-        if (p == null) return NotFound();
+        if (p == null) return NotFound(new { message = "Producto no encontrado." });
         return Ok(p);
     }
 
@@ -44,10 +44,10 @@ public class ProductsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] ProductDto dto)
     {
-        if (id != dto.Id) return BadRequest();
+        if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var ok = await _products.UpdateAsync(id, dto);
-        if (!ok) return NotFound();
+        if (!ok) return NotFound(new { message = "Producto no encontrado." });
         return NoContent();
     }
 
@@ -56,7 +56,7 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var ok = await _products.DeleteAsync(id);
-        if (!ok) return NotFound();
+        if (!ok) return NotFound(new { message = "Producto no encontrado." });
         return NoContent();
     }
 
@@ -68,7 +68,7 @@ public class ProductsController : ControllerBase
         await using var ms = new MemoryStream();
         await file.CopyToAsync(ms, ct);
         var (ok, error, imageUrl) = await _products.UploadImageAsync(id, ms.ToArray(), file.FileName, file.ContentType, ct);
-        if (!ok && error == "NOT_FOUND") return NotFound();
+        if (!ok && error == "NOT_FOUND") return NotFound(new { message = "Producto no encontrado." });
         if (!ok) return BadRequest(new { message = error });
         return Ok(new { imageUrl });
     }
@@ -78,7 +78,7 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> RemoveImage(int id, CancellationToken ct)
     {
         var (ok, error) = await _products.RemoveImageAsync(id, ct);
-        if (!ok && error == "NOT_FOUND") return NotFound();
+        if (!ok && error == "NOT_FOUND") return NotFound(new { message = "Producto no encontrado." });
         if (!ok) return BadRequest(new { message = error });
         return NoContent();
     }

@@ -33,7 +33,7 @@ public class ConfiguracionController : ControllerBase
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
-        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema });
+        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta });
     }
 
     [HttpPut("profile")]
@@ -41,12 +41,13 @@ public class ConfiguracionController : ControllerBase
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
-        user.Nombre = dto.Nombre;
-        user.Apellido = dto.Apellido;
-        user.Avatar = dto.Avatar;
-        user.Tema = dto.Tema;
+        if (!string.IsNullOrWhiteSpace(dto.Nombre)) user.Nombre = dto.Nombre;
+        if (!string.IsNullOrWhiteSpace(dto.Apellido)) user.Apellido = dto.Apellido;
+        if (!string.IsNullOrWhiteSpace(dto.Avatar)) user.Avatar = dto.Avatar;
+        if (!string.IsNullOrWhiteSpace(dto.Tema)) user.Tema = dto.Tema;
+        if (!string.IsNullOrWhiteSpace(dto.Paleta)) user.Paleta = dto.Paleta;
         await _userManager.UpdateAsync(user);
-        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema });
+        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta });
     }
 
     [HttpPost("seed")]

@@ -71,7 +71,7 @@ public class UsuariosController : ControllerBase
     public async Task<IActionResult> SetRol(string id, [FromBody] RolDto dto)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user == null) return NotFound();
+        if (user == null) return NotFound(new { message = "Usuario no encontrado." });
         var roles = await _userManager.GetRolesAsync(user);
         await _userManager.RemoveFromRolesAsync(user, roles);
         await _userManager.AddToRoleAsync(user, dto.Rol);
@@ -82,7 +82,7 @@ public class UsuariosController : ControllerBase
     public async Task<IActionResult> Delete(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user == null) return NotFound();
+        if (user == null) return NotFound(new { message = "Usuario no encontrado." });
         // prevent deleting self? optional
         await _userManager.DeleteAsync(user);
         return NoContent();

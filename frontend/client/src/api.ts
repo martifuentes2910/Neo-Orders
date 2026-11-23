@@ -55,17 +55,19 @@ async function handle<T>(res: Response): Promise<T> {
   }
   if (!res.ok) {
     let message = `Error ${res.status}`;
-    let body: any = null;
+    let body: unknown = null;
     try {
       body = await res.json();
-      if (body?.message) message = body.message;
-      else if (Array.isArray(body?.errors) && body.errors[0]?.row) message = 'El archivo contiene errores de validación.';
-      else if (body?.errors) message = Object.values(body.errors).flat().join(' ');
-      else if (body?.title) message = body.title;
+      const b = body as Record<string, unknown> | null;
+      const errors = b?.errors;
+      if (typeof b?.message === 'string') message = b.message;
+      else if (Array.isArray(errors) && (errors[0] as Record<string, unknown> | undefined)?.row) message = 'El archivo contiene errores de validación.';
+      else if (errors && typeof errors === 'object' && !Array.isArray(errors)) message = Object.values(errors as Record<string, unknown[]>).flat().join(' ');
+      else if (typeof b?.title === 'string') message = b.title;
     } catch {
       /* ignore */
     }
-    const err: any = new Error(message);
+    const err = new Error(message) as Error & { body?: unknown };
     if (body) err.body = body;
     throw err;
   }

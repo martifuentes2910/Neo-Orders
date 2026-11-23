@@ -20,7 +20,7 @@ public class SellersController : ControllerBase
     public async Task<IActionResult> Get(int id)
     {
         var s = await _sellers.GetByIdAsync(id);
-        if (s == null) return NotFound();
+        if (s == null) return NotFound(new { message = "Vendedor no encontrado." });
         return Ok(s);
     }
 
@@ -37,10 +37,10 @@ public class SellersController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] SellerDto dto)
     {
-        if (id != dto.Id) return BadRequest();
+        if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var ok = await _sellers.UpdateAsync(id, dto);
-        if (!ok) return NotFound();
+        if (!ok) return NotFound(new { message = "Vendedor no encontrado." });
         return NoContent();
     }
 
@@ -49,7 +49,7 @@ public class SellersController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var (ok, error) = await _sellers.DeleteAsync(id);
-        if (!ok && error == "NOT_FOUND") return NotFound();
+        if (!ok && error == "NOT_FOUND") return NotFound(new { message = "Vendedor no encontrado." });
         if (!ok) return BadRequest(new { message = error });
         return NoContent();
     }
