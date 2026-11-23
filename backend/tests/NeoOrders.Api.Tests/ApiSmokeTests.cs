@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NeoOrders.Infrastructure.Data;
+using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 
@@ -80,15 +82,30 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            // Registrar opciones "limpias": el AddDbContext de Program.cs deja
+            // configuraciones IConfigureOptions con UseSqlServer que, de aplicarse,
+            // mezclan providers y rompen cualquier acceso a Identity.
             services.RemoveAll(typeof(DbContextOptions<AppDbContext>));
             services.RemoveAll(typeof(AppDbContext));
 
             var dbName = $"NeoOrdersApiTests-{Guid.NewGuid()}";
-            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(dbName));
+            services.AddScoped<DbContextOptions<AppDbContext>>(_ =>
+                new DbContextOptionsBuilder<AppDbContext>()
+                    .UseInMemoryDatabase(dbName)
+                    .Options);
+            services.AddScoped(sp =>
+                new AppDbContext(sp.GetRequiredService<DbContextOptions<AppDbContext>>()));
         });
     }
 
-    public TestAuthClient CreateClientWithTestAuth()
+    /// <summary>
+    /// Cliente con esquema de autenticación de prueba. Sin argumentos mantiene el
+    /// comportamiento original (claims "test-user", sin roles).
+    /// </summary>
+    public TestAuthClient CreateClientWithTestAuth(
+        string? userId = null,
+        string? name = null,
+        IEnumerable<string>? roles = null)
     {
         var factory = WithWebHostBuilder(builder =>
         {
@@ -100,7 +117,12 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
                         options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
                         options.DefaultScheme = TestAuthHandler.SchemeName;
                     })
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+                    .AddScheme<TestAuthOptions, TestAuthHandler>(TestAuthHandler.SchemeName, options =>
+                    {
+                        options.UserId = userId ?? TestAuthOptions.DefaultUserId;
+                        options.Name = name ?? TestAuthOptions.DefaultName;
+                        options.Roles = roles?.ToArray() ?? [];
+                    });
                 services.AddAuthorization();
             });
         });
@@ -126,6 +148,39 @@ public sealed class TestAuthClient : IDisposable
 
     public HttpClient Client { get; }
 
+    /// <summary>
+    /// Siembra un usuario (y opcionalmente roles) directamente en el DB InMemory
+    /// de este factory derivado, sin depender de login real.
+    /// </summary>
+    public async Task SeedUserAsync(ApplicationUser user, params string[] roles)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+
+        var created = await userManager.CreateAsync(user);
+        if (!created.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"No se pudo sembrar el usuario de prueba: {string.Join(" ", created.Errors.Select(e => e.Description))}");
+        }
+
+        foreach (var role in roles.Distinct())
+        {
+            if (!await roleManager.RoleExistsAsync(role))
+            {
+                var roleResult = await roleManager.CreateAsync(new IdentityRole(role));
+                if (!roleResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"No se pudo crear el rol de prueba '{role}': {string.Join(" ", roleResult.Errors.Select(e => e.Description))}");
+                }
+            }
+
+            await userManager.AddToRoleAsync(user, role);
+        }
+    }
+
     public void Dispose()
     {
         Client.Dispose();
@@ -133,12 +188,22 @@ public sealed class TestAuthClient : IDisposable
     }
 }
 
-internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+internal sealed class TestAuthOptions : AuthenticationSchemeOptions
+{
+    public const string DefaultUserId = "test-user";
+    public const string DefaultName = "test-user";
+
+    public string UserId { get; set; } = DefaultUserId;
+    public string Name { get; set; } = DefaultName;
+    public string[] Roles { get; set; } = [];
+}
+
+internal sealed class TestAuthHandler : AuthenticationHandler<TestAuthOptions>
 {
     public const string SchemeName = "Test";
 
     public TestAuthHandler(
-        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        IOptionsMonitor<TestAuthOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder)
         : base(options, logger, encoder)
@@ -147,11 +212,12 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, "test-user"),
-            new Claim(ClaimTypes.Name, "test-user")
+            new(ClaimTypes.NameIdentifier, Options.UserId),
+            new(ClaimTypes.Name, Options.Name)
         };
+        claims.AddRange(Options.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, SchemeName);
