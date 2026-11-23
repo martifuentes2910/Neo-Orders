@@ -23,7 +23,7 @@ import type {
 export type { CsvImportError, CsvImportResult, PriceAdjustmentItem, PriceAdjustmentPreviewResponse, PriceAdjustmentApplyResponse } from './types';
 
 const BASE =
-  (import.meta as any).env?.VITE_API_URL ||
+  (import.meta.env?.VITE_API_URL as string | undefined) ||
   (typeof window !== 'undefined'
     ? `${window.location.protocol}//${window.location.hostname}:5286/api`
     : 'http://localhost:5286/api');
