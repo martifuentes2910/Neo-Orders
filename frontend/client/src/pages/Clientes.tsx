@@ -1,6 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { clientsFeatureApi, useClients } from '@/features/clients';
+import { useClients } from '@/features/clients';
 import { Plus, Pencil, Trash2, Search, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ export default function Clientes() {
     clientes, loading, search, setSearch, showForm, setShowForm,
     editing, saving, deleting, showImport, setShowImport,
     register, errors, submit, openCreate, openEdit, load, remove,
+    templateUrl, importCsv,
   } = useClients();
 
   const { sorted, sort, toggle } = useTableSort(clientes, {
@@ -110,9 +111,9 @@ export default function Clientes() {
         open={showImport}
         onOpenChange={setShowImport}
         title="Importar clientes desde CSV"
-        templateUrl={clientsFeatureApi.templateUrl()}
+        templateUrl={templateUrl()}
         templateName="plantilla-clientes.csv"
-        onImport={(file) => clientsFeatureApi.importCsv(file)}
+        onImport={(file) => importCsv(file)}
         onImported={load}
       />
 

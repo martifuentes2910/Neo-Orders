@@ -1,6 +1,6 @@
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { IMAGE_ACCEPT, productsFeatureApi, useProducts } from '@/features/products';
+import { IMAGE_ACCEPT, useProducts } from '@/features/products';
 import { Plus, Pencil, Trash2, Image as ImageIcon, Percent, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,7 @@ export default function Productos() {
     showAdjust, setShowAdjust, adjustPercent, setAdjustPercent,
     adjustPreview, setAdjustPreview, adjustLoading, adjustApplying,
     adjustError, setAdjustError, openAdjust, previewAdjust, applyAdjust,
-    showImport, setShowImport, remove, onImported,
+    showImport, setShowImport, remove, onImported, templateUrl, importCsv,
   } = useProducts();
 
   const { sorted, sort, toggle } = useTableSort(products, {
@@ -139,9 +139,9 @@ export default function Productos() {
         open={showImport}
         onOpenChange={setShowImport}
         title="Importar productos desde CSV"
-        templateUrl={productsFeatureApi.templateUrl()}
+        templateUrl={templateUrl()}
         templateName="plantilla-productos.csv"
-        onImport={(file) => productsFeatureApi.importCsv(file)}
+        onImport={(file) => importCsv(file)}
         onImported={onImported}
       />
 

@@ -6,7 +6,7 @@ import {
   getStatusTextColor,
   type OrderStatus,
 } from '../types';
-import { ordersFeatureApi, useOrders, esTerminal } from '@/features/orders';
+import { useOrders, esTerminal } from '@/features/orders';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -42,7 +42,7 @@ export default function Pedidos() {
     showForm, setShowForm, editing, form, setForm, errors,
     saving, deleting, showImport, setShowImport,
     bloqueado, soloEstado, opcionesEstado, productoDadoDeBaja, productSelectValue,
-    onProductChange, openCreate, openEdit, save, remove, load,
+    onProductChange, openCreate, openEdit, save, remove, load, templateUrl, importCsv,
   } = useOrders();
 
   const { sorted, sort, toggle } = useTableSort(orders, {
@@ -211,9 +211,9 @@ export default function Pedidos() {
         open={showImport}
         onOpenChange={setShowImport}
         title="Importar pedidos desde CSV"
-        templateUrl={ordersFeatureApi.templateUrl()}
+        templateUrl={templateUrl()}
         templateName="plantilla-pedidos.csv"
-        onImport={(file) => ordersFeatureApi.importCsv(file)}
+        onImport={(file) => importCsv(file)}
         onImported={load}
       />
 
