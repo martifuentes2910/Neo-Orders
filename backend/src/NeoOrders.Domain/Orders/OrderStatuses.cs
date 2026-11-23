@@ -19,6 +19,8 @@ public static class OrderStatuses
         [Cancelado] = [],
     };
 
+    public static bool IsValid(string? estado) => !string.IsNullOrWhiteSpace(estado) && All.Contains(estado);
+
     public static bool CanTransition(string from, string to) =>
         from == to || (Transitions.TryGetValue(from, out var allowed) && allowed.Contains(to));
 
