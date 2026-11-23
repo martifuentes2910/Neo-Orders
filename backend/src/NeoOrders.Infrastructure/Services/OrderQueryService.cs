@@ -65,4 +65,7 @@ public class OrderQueryService : IOrderQueryService
                 OrderNumber = p.OrderNumber
             }).FirstOrDefaultAsync();
     }
+
+    public Task<string?> GetEstadoAsync(int id) =>
+        _db.Orders.AsNoTracking().Where(o => o.Id == id).Select(o => o.Estado).FirstOrDefaultAsync();
 }

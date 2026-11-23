@@ -6,4 +6,5 @@ public interface IOrderQueryService
 {
     Task<List<OrderListItemDto>> ListAsync(string? search, string? estado, int? clientId, int? sellerId);
     Task<OrderListItemDto?> GetByIdAsync(int id);
+    Task<string?> GetEstadoAsync(int id);
 }

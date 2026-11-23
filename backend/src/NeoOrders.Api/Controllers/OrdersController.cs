@@ -1,13 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
-using NeoOrders.Application.Contracts.Orders;
-using NeoOrders.Application.Contracts.Notifications;
 using NeoOrders.Application.Contracts.Import;
-using NeoOrders.Domain.Orders;
+using NeoOrders.Application.Contracts.Orders;
 using NeoOrders.Application.DTOs.Orders;
+using NeoOrders.Domain.Orders;
 
 namespace NeoOrders.Api.Controllers;
 
@@ -16,13 +12,11 @@ namespace NeoOrders.Api.Controllers;
 [Authorize]
 public class OrdersController : ControllerBase
 {
-    private readonly AppDbContext _db;
     private readonly IOrderService _orderService;
     private readonly IOrderQueryService _orderQuery;
     private readonly ICsvImportService _csvImport;
-    public OrdersController(AppDbContext db, IOrderService orderService, IOrderQueryService orderQuery, ICsvImportService csvImport)
+    public OrdersController(IOrderService orderService, IOrderQueryService orderQuery, ICsvImportService csvImport)
     {
-        _db = db;
         _orderService = orderService;
         _orderQuery = orderQuery;
         _csvImport = csvImport;
@@ -30,10 +24,7 @@ public class OrdersController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? estado, [FromQuery] int? clientId, [FromQuery] int? sellerId)
-    {
-        var list = await _orderQuery.ListAsync(search, estado, clientId, sellerId);
-        return Ok(list);
-    }
+        => Ok(await _orderQuery.ListAsync(search, estado, clientId, sellerId));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
@@ -57,7 +48,7 @@ public class OrdersController : ControllerBase
     {
         if (id != dto.Id) return BadRequest();
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var current = await _db.Orders.AsNoTracking().Where(o => o.Id == id).Select(o => o.Estado).FirstOrDefaultAsync();
+        var current = await _orderQuery.GetEstadoAsync(id);
         if (current != null && OrderStatuses.EditLocked.Contains(current))
         {
             var statusResult = await _orderService.UpdateStatusAsync(id, dto.Estado);
