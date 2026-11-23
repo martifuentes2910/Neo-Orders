@@ -347,6 +347,36 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task PutUsersRol_RolDesconocido_Retorna400YConservaRoles()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var suffix = Guid.NewGuid().ToString("N");
+        var email = $"users.rol.invalid.{suffix}@test.local";
+        var id = $"users-rol-invalid-{suffix}";
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = id,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        }, "Empleado");
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/users/{id}/rol", new { rol = "RolInexistente" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Rol no válido.", GetProperty(doc.RootElement, "message").GetString());
+
+        // Regresión: el rol desconocido no debe dejar al usuario sin roles.
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        var usuario = Assert.Single(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "id").GetString() == id);
+        Assert.Contains("Empleado", GetProperty(usuario, "roles").EnumerateArray().Select(r => r.GetString()));
+    }
+
+    [Fact]
     public async Task PostUsers_PasswordInvalida_Retorna400ConMessageYErrors()
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);

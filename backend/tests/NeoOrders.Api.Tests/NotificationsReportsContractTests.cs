@@ -70,6 +70,28 @@ public class NotificationsReportsContractTests : IClassFixture<NeoOrdersApiFacto
         Assert.Equal(1, GetProperty(GetProperty(root, "resumen"), "total").GetInt32());
     }
 
+    [Theory]
+    [InlineData(-5)]
+    [InlineData(0)]
+    [InlineData(500)]
+    public async Task GetNotifications_ConTakeInvalido_Retorna200ConItemsDentroDelRango(int take)
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        await SeedNotificationContextAsync(auth);
+
+        var response = await auth.Client.GetAsync($"/api/notifications?take={take}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        var items = GetProperty(root, "items");
+        Assert.Equal(JsonValueKind.Array, items.ValueKind);
+        // NotificationService normaliza take: <=0 => 60 y siempre lo acota a 200.
+        // Con dos notificaciones sembradas, los tres casos devuelven la página completa.
+        Assert.Equal(2, items.GetArrayLength());
+        Assert.Equal(2, GetProperty(GetProperty(root, "resumen"), "total").GetInt32());
+    }
+
     [Fact]
     public async Task GetReports_ConAuth_Retorna200ConShapeResumen()
     {
@@ -125,6 +147,7 @@ public class NotificationsReportsContractTests : IClassFixture<NeoOrdersApiFacto
 
     [Theory]
     [InlineData("/api/reports/productos-vendidos?page=0", "page")]
+    [InlineData("/api/reports/ventas-vendedor?pageSize=101", "pageSize")]
     [InlineData("/api/reports/clientes-compras?pageSize=101", "pageSize")]
     public async Task GetReportesDetalle_PaginacionInvalida_Retorna400ConMessage(string url, string campo)
     {

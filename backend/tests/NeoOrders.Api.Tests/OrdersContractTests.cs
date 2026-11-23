@@ -326,6 +326,66 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task PutOrder_PendienteConClienteInexistente_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+        var missingClientId = await auth.QueryDbAsync(async db =>
+            (await db.Clients.Select(c => c.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/orders/{orderId}", new
+        {
+            id = orderId,
+            clientId = missingClientId,
+            sellerId,
+            productId,
+            productName = "Producto Contrato",
+            cantidad = 1,
+            precioUnitario = 10.50m,
+            estado = "Pendiente"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Cliente no válido", GetProperty(doc.RootElement, "message").GetString());
+
+        var persistedClientId = await auth.QueryDbAsync(async db =>
+            (await db.Orders.FindAsync(orderId))!.ClientId);
+        Assert.Equal(clientId, persistedClientId);
+    }
+
+    [Fact]
+    public async Task PutOrder_PendienteConVendedorInexistente_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+        var missingSellerId = await auth.QueryDbAsync(async db =>
+            (await db.Sellers.Select(s => s.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/orders/{orderId}", new
+        {
+            id = orderId,
+            clientId,
+            sellerId = missingSellerId,
+            productId,
+            productName = "Producto Contrato",
+            cantidad = 1,
+            precioUnitario = 10.50m,
+            estado = "Pendiente"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Vendedor no válido", GetProperty(doc.RootElement, "message").GetString());
+
+        var persistedSellerId = await auth.QueryDbAsync(async db =>
+            (await db.Orders.FindAsync(orderId))!.SellerId);
+        Assert.Equal(sellerId, persistedSellerId);
+    }
+
+    [Fact]
     public async Task PatchOrderStatus_ProcesadoAEnviado_Retorna204()
     {
         using var auth = _factory.CreateClientWithTestAuth();

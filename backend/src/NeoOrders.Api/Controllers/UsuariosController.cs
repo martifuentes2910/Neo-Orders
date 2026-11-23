@@ -76,6 +76,10 @@ public class UsuariosController : ControllerBase
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound(new { message = "Usuario no encontrado." });
+        // Sin esta guardia se removían todos los roles y AddToRoleAsync fallaba
+        // silenciosamente, dejando al usuario sin ningún rol (KAN-41).
+        if (string.IsNullOrWhiteSpace(dto.Rol) || !await _roleManager.RoleExistsAsync(dto.Rol))
+            return BadRequest(new { message = "Rol no válido." });
         var roles = await _userManager.GetRolesAsync(user);
         await _userManager.RemoveFromRolesAsync(user, roles);
         await _userManager.AddToRoleAsync(user, dto.Rol);

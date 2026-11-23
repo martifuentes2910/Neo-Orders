@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -30,6 +31,42 @@ public class ConfigAdminContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var doc = await ReadJsonAsync(response);
         Assert.Equal("NeoOrders Test", GetProperty(doc.RootElement, "nombreEmpresa").GetString());
+    }
+
+    [Fact]
+    public async Task PutConfigCompany_CuerpoJsonInvalido_Retorna400()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+
+        using var body = new StringContent("{", Encoding.UTF8, "application/json");
+        var response = await auth.Client.PutAsync("/api/config/company", body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        if (mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+        {
+            using var doc = await ReadJsonAsync(response);
+            Assert.True(
+                doc.RootElement.TryGetProperty("errors", out _) ||
+                doc.RootElement.TryGetProperty("message", out _));
+        }
+    }
+
+    [Fact]
+    public async Task PutConfigCompany_PayloadVacio_Retorna200ConValoresPorDefecto()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+
+        // CompanySettingsDto no tiene DataAnnotations: el payload vacío se acepta
+        // y se persiste con los valores iniciales del DTO.
+        var response = await auth.Client.PutAsJsonAsync("/api/config/company", new { });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        Assert.Equal("NeoOrders", GetProperty(root, "nombreEmpresa").GetString());
+        Assert.Equal("ARS", GetProperty(root, "moneda").GetString());
+        Assert.Equal(1200m, GetProperty(root, "tipoDeCambio").GetDecimal());
     }
 
     [Fact]

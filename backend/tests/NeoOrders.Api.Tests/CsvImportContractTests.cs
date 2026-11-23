@@ -323,6 +323,35 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task PostOrdersImportCsv_ClientIdVacioOConFormatoInvalido_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var orderNumberVacio = $"CSV-{Guid.NewGuid():N}"[..20];
+        var orderNumberTexto = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumberVacio};;;1;1\n" +
+            $"{orderNumberTexto};abc;;1;1\n",
+            "pedidos-cliente-formato-invalido.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            GetProperty(e, "row").GetInt32() == 2 &&
+            string.Equals(GetProperty(e, "field").GetString(), "ClientId", StringComparison.OrdinalIgnoreCase) &&
+            GetProperty(e, "message").GetString()?.Contains("ClientId inválido", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.Contains(errors, e =>
+            GetProperty(e, "row").GetInt32() == 3 &&
+            string.Equals(GetProperty(e, "field").GetString(), "ClientId", StringComparison.OrdinalIgnoreCase) &&
+            GetProperty(e, "value").GetString() == "abc" &&
+            GetProperty(e, "message").GetString()?.Contains("ClientId inválido", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
     public async Task PostOrdersImportCsv_CantidadInvalida_Retorna400ConErrors()
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
@@ -422,6 +451,25 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Contains(errors, e =>
             string.Equals(GetProperty(e, "field").GetString(), "file", StringComparison.OrdinalIgnoreCase)
             && GetProperty(e, "message").GetString()?.Contains("vacío", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Theory]
+    [InlineData("/api/products/import-csv", "Sku;Name;Category;BasePrice;Cost;Stock;MinStockAlert;Active\n", "productos-solo-header.csv")]
+    [InlineData("/api/clients/import-csv", "Name;Email;Phone;Address\n", "clientes-solo-header.csv")]
+    public async Task PostImportCsv_SoloHeader_Retorna400ConErrors(string url, string contenido, string fileName)
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        using var form = CreateForm(contenido, fileName);
+
+        var response = await auth.Client.PostAsync(url, form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            GetProperty(e, "row").GetInt32() == 0 &&
+            string.Equals(GetProperty(e, "field").GetString(), "file", StringComparison.OrdinalIgnoreCase) &&
+            GetProperty(e, "message").GetString()?.Contains("no contiene filas de datos", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     /// <summary>
