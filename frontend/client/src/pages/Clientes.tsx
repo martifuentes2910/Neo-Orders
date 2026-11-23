@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { api } from '../api';
-import type { Client } from '../types';
+import { clientsFeatureApi, useClients } from '@/features/clients';
 import { Plus, Pencil, Trash2, Search, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,37 +11,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import SortableTableHead from '@/components/SortableTableHead';
 import { useTableSort } from '@/hooks/useTableSort';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { motion, useReducedMotion } from 'framer-motion';
-import { toast } from 'sonner';
 import CsvImportDialog from '@/components/CsvImportDialog';
-
-let cachedClientes: Client[] | null = null;
-
-const schema = z.object({
-  nombre: z.string().min(2, 'Nombre inválido'),
-  email: z.string().email('Email inválido'),
-  telefono: z.string().optional().or(z.literal('')),
-  direccion: z.string().optional().or(z.literal('')),
-});
-
-const emptyForm = { nombre: '', email: '', telefono: '', direccion: '' };
 
 export default function Clientes() {
   const { formatMoney } = useSettings();
   const reduceMotion = useReducedMotion();
   const { user } = useAuth();
   const isAdmin = user?.roles?.includes('Admin');
-  const [clientes, setClientes] = useState<any[]>(cachedClientes || []);
-  const [loading, setLoading] = useState(!cachedClientes);
-  const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Client | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<number | null>(null);
-  const [showImport, setShowImport] = useState(false);
+
+  // Estado y acciones del slice, extraídos a features/clients.
+  const {
+    clientes, loading, search, setSearch, showForm, setShowForm,
+    editing, saving, deleting, showImport, setShowImport,
+    register, errors, submit, openCreate, openEdit, load, remove,
+  } = useClients();
 
   const { sorted, sort, toggle } = useTableSort(clientes, {
     id: (c) => c.id,
@@ -54,69 +36,6 @@ export default function Clientes() {
     pedidos: (c) => c.ordersCount ?? 0,
     total: (c) => c.totalSpent ?? 0,
   });
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: emptyForm,
-  });
-
-  const load = async () => {
-    if (!cachedClientes) setLoading(true);
-    try {
-      const data = await api.clients.list(search);
-      cachedClientes = data;
-      setClientes(data);
-    } catch {
-      toast.error('Error al cargar clientes');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
-  const skipSearch = useRef(true);
-  useEffect(() => {
-    if (skipSearch.current) {
-      skipSearch.current = false;
-      return;
-    }
-    const t = setTimeout(() => load(), 300);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
-
-  const openCreate = () => { setEditing(null); reset(emptyForm); setShowForm(true); };
-  const openEdit = (c: Client) => { setEditing(c); reset({ nombre: c.nombre, email: c.email, telefono: c.telefono || '', direccion: c.direccion || '' }); setShowForm(true); };
-
-  const save = async (data: { nombre: string; email: string; telefono?: string; direccion?: string }) => {
-    setSaving(true);
-    try {
-      if (editing) await api.clients.update(editing.id, { ...data, id: editing.id });
-      else await api.clients.create(data);
-      toast.success(editing ? 'Cliente actualizado' : 'Cliente creado');
-      setShowForm(false);
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = async (id: number) => {
-    if (!confirm('¿Eliminar este cliente?')) return;
-    setDeleting(id);
-    try {
-      await api.clients.remove(id);
-      toast.success('Cliente eliminado');
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setDeleting(null);
-    }
-  };
-
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -191,9 +110,9 @@ export default function Clientes() {
         open={showImport}
         onOpenChange={setShowImport}
         title="Importar clientes desde CSV"
-        templateUrl={api.clients.templateUrl()}
+        templateUrl={clientsFeatureApi.templateUrl()}
         templateName="plantilla-clientes.csv"
-        onImport={(file) => api.clients.importCsv(file)}
+        onImport={(file) => clientsFeatureApi.importCsv(file)}
         onImported={load}
       />
 
@@ -224,7 +143,7 @@ export default function Clientes() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowForm(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleSubmit(save)} disabled={saving}>{saving ? 'Guardando…' : editing ? 'Actualizar' : 'Crear'}</Button>
+            <Button onClick={submit} disabled={saving}>{saving ? 'Guardando…' : editing ? 'Actualizar' : 'Crear'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

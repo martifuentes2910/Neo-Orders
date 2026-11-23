@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../api';
-import type { PriceAdjustmentPreviewResponse, Product } from '../types';
+import { IMAGE_ACCEPT, productsFeatureApi, useProducts } from '@/features/products';
 import { Plus, Pencil, Trash2, Image as ImageIcon, Percent, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,44 +15,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import SortableTableHead from '@/components/SortableTableHead';
 import ProductImage from '@/components/ProductImage';
 import { useTableSort } from '@/hooks/useTableSort';
-import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'framer-motion';
 import CsvImportDialog from '@/components/CsvImportDialog';
-
-const emptyForm = { sku: '', name: '', category: 'General', basePrice: 0, cost: 0, stock: 0, minStockAlert: 5, active: true };
-const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
-const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
 
 export default function Productos() {
   const { formatMoney } = useSettings();
   const reduceMotion = useReducedMotion();
   const { user } = useAuth();
   const isAdmin = user?.roles?.includes('Admin');
-  const [products, setProducts] = useState<any[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sku, setSku] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [category, setCategory] = useState('Todos');
-  const [onlyInStock, setOnlyInStock] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<any>(emptyForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<number | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [removeImage, setRemoveImage] = useState(false);
-  const [showAdjust, setShowAdjust] = useState(false);
-  const [adjustPercent, setAdjustPercent] = useState('10');
-  const [adjustPreview, setAdjustPreview] = useState<PriceAdjustmentPreviewResponse | null>(null);
-  const [adjustLoading, setAdjustLoading] = useState(false);
-  const [adjustApplying, setAdjustApplying] = useState(false);
-  const [adjustError, setAdjustError] = useState<string | null>(null);
-  const [showImport, setShowImport] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const firstLoad = useRef(true);
+
+  // Estado y acciones del slice, extraídos a features/products.
+  const {
+    products, categories, loading,
+    sku, setSku, nombre, setNombre, category, setCategory,
+    onlyInStock, setOnlyInStock, hasFilters, clearFilters,
+    showForm, setShowForm, editing, form, setForm, errors,
+    saving, deleting, imagePreview, fileInputRef,
+    openCreate, openEdit, selectImage, clearImage, save,
+    showAdjust, setShowAdjust, adjustPercent, setAdjustPercent,
+    adjustPreview, setAdjustPreview, adjustLoading, adjustApplying,
+    adjustError, setAdjustError, openAdjust, previewAdjust, applyAdjust,
+    showImport, setShowImport, remove, onImported,
+  } = useProducts();
 
   const { sorted, sort, toggle } = useTableSort(products, {
     sku: (p) => p.sku,
@@ -63,197 +45,6 @@ export default function Productos() {
     precio: (p) => p.basePrice,
     stock: (p) => p.stock,
   });
-
-  const load = async () => {
-    if (firstLoad.current) setLoading(true);
-    try {
-      const data = await api.products.list(
-        undefined,
-        category,
-        onlyInStock,
-        sku || undefined,
-        nombre || undefined
-      );
-      setProducts(data);
-    } catch {
-      toast.error('Error al cargar productos');
-    } finally {
-      setLoading(false);
-      firstLoad.current = false;
-    }
-  };
-
-  useEffect(() => {
-    const t = setTimeout(load, sku || nombre ? 300 : 0);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sku, nombre, category, onlyInStock]);
-  useEffect(() => { api.products.categories().then(setCategories).catch(() => {}); }, []);
-  useEffect(() => () => {
-    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
-  }, [imagePreview]);
-
-  const hasFilters = !!(sku || nombre || category !== 'Todos' || onlyInStock);
-
-  const clearFilters = () => {
-    setSku('');
-    setNombre('');
-    setCategory('Todos');
-    setOnlyInStock(false);
-  };
-
-  const resetImageState = (url?: string | null) => {
-    setImageFile(null);
-    setImagePreview(url ?? null);
-    setRemoveImage(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setErrors({}); resetImageState(); setShowForm(true); };
-  const openEdit = (p: Product) => {
-    setEditing(p);
-    setForm({ sku: p.sku, name: p.name, category: p.category, basePrice: p.basePrice, cost: p.cost, stock: p.stock, minStockAlert: p.minStockAlert, active: p.active });
-    setErrors({});
-    resetImageState(p.imageUrl);
-    setShowForm(true);
-  };
-
-  const selectImage = (file?: File) => {
-    if (!file) return;
-    if (file.size > IMAGE_MAX_BYTES) {
-      setErrors((prev) => ({ ...prev, image: 'La imagen no puede superar los 2 MB.' }));
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-    if (!IMAGE_ACCEPT.split(',').includes(file.type)) {
-      setErrors((prev) => ({ ...prev, image: 'Formato no admitido. Use JPG, PNG o WebP.' }));
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-    setErrors((prev) => ({ ...prev, image: '' }));
-    setImageFile(file);
-    setRemoveImage(false);
-    setImagePreview(URL.createObjectURL(file));
-  };
-
-  const clearImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setRemoveImage(true);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!form.sku?.trim()) e.sku = 'SKU obligatorio';
-    if (!form.name?.trim()) e.name = 'Nombre obligatorio';
-    if (!form.category?.trim()) e.category = 'Categoría obligatoria';
-    if (!form.basePrice || form.basePrice <= 0) e.basePrice = 'Precio inválido';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const save = async () => {
-    if (!validate()) return;
-    setSaving(true);
-    try {
-      let id: number;
-      if (editing) {
-        await api.products.update(editing.id, { ...form, id: editing.id });
-        id = editing.id;
-      } else {
-        const created = await api.products.create(form);
-        id = created.id;
-      }
-
-      // KAN-23: si falla la imagen, el producto ya quedó guardado y se avisa sin perder el alta.
-      if (imageFile) {
-        try {
-          await api.products.uploadImage(id, imageFile);
-        } catch (err: unknown) {
-          toast.warning('Producto guardado, pero no se pudo subir la imagen', { description: err instanceof Error ? err.message : 'Error inesperado' });
-        }
-      } else if (removeImage && editing) {
-        try {
-          await api.products.removeImage(id);
-        } catch (err: unknown) {
-          toast.warning('Producto guardado, pero no se pudo quitar la imagen', { description: err instanceof Error ? err.message : 'Error inesperado' });
-        }
-      }
-
-      toast.success(editing ? 'Producto actualizado' : 'Producto creado');
-      setShowForm(false);
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const openAdjust = () => {
-    setAdjustPercent('10');
-    setAdjustPreview(null);
-    setAdjustError(null);
-    setShowAdjust(true);
-  };
-
-  const previewAdjust = async () => {
-    const percent = Number(adjustPercent);
-    if (!Number.isFinite(percent)) {
-      setAdjustError('Ingresá un porcentaje válido.');
-      return;
-    }
-    if (percent < -90 || percent > 200) {
-      setAdjustError('El porcentaje debe estar entre -90 y 200.');
-      return;
-    }
-    setAdjustLoading(true);
-    setAdjustError(null);
-    try {
-      const preview = await api.products.previewPriceAdjustment(percent);
-      setAdjustPreview(preview);
-      if (preview.errors.length > 0) setAdjustError(preview.errors[0]);
-    } catch (err: unknown) {
-      setAdjustPreview(null);
-      setAdjustError(err instanceof Error ? err.message : 'No se pudo generar la vista previa.');
-    } finally {
-      setAdjustLoading(false);
-    }
-  };
-
-  const applyAdjust = async () => {
-    const percent = Number(adjustPercent);
-    if (!Number.isFinite(percent) || !adjustPreview) return;
-    setAdjustApplying(true);
-    setAdjustError(null);
-    try {
-      const result = await api.products.applyPriceAdjustment(percent);
-      toast.success(`Precios actualizados: ${result.affectedCount} producto(s) activo(s).`);
-      setShowAdjust(false);
-      setAdjustPreview(null);
-      await load();
-    } catch (err: unknown) {
-      setAdjustError(err instanceof Error ? err.message : 'No se pudo aplicar el ajuste.');
-    } finally {
-      setAdjustApplying(false);
-    }
-  };
-
-  const remove = async (id: number) => {
-    if (!confirm('¿Eliminar este producto?')) return;
-    setDeleting(id);
-    try {
-      await api.products.remove(id);
-      toast.success('Producto eliminado');
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setDeleting(null);
-    }
-  };
-
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -348,10 +139,10 @@ export default function Productos() {
         open={showImport}
         onOpenChange={setShowImport}
         title="Importar productos desde CSV"
-        templateUrl={api.products.templateUrl()}
+        templateUrl={productsFeatureApi.templateUrl()}
         templateName="plantilla-productos.csv"
-        onImport={(file) => api.products.importCsv(file)}
-        onImported={async () => { await load(); api.products.categories().then(setCategories).catch(() => {}); }}
+        onImport={(file) => productsFeatureApi.importCsv(file)}
+        onImported={onImported}
       />
 
       <Dialog open={showAdjust} onOpenChange={(open) => { if (!adjustApplying) { setShowAdjust(open); if (!open) { setAdjustPreview(null); setAdjustError(null); } } }}>

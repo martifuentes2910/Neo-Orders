@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-import { api } from '../api';
-import type { Seller } from '../types';
+import { useSellers } from '@/features/sellers';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,86 +12,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import SortableTableHead from '@/components/SortableTableHead';
 import { useTableSort } from '@/hooks/useTableSort';
-import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'framer-motion';
-
-let cachedVendedores: Seller[] | null = null;
-
-const emptyForm = { name: '', email: '', phone: '', commissionPercentage: 5, active: true };
 
 export default function Vendedores() {
   const reduceMotion = useReducedMotion();
   const { user } = useAuth();
   const isAdmin = user?.roles?.includes('Admin');
-  const [sellers, setSellers] = useState<any[]>(cachedVendedores || []);
-  const [loading, setLoading] = useState(!cachedVendedores);
-  const [search, setSearch] = useState('');
-  const [activoFilter, setActivoFilter] = useState('Todos');
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Seller | null>(null);
-  const [form, setForm] = useState<any>(emptyForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<number | null>(null);
 
-  const load = async () => {
-    if (!cachedVendedores) setLoading(true);
-    try { 
-      const data = await api.sellers.list(); 
-      cachedVendedores = data;
-      setSellers(data); 
-    } catch { toast.error('Error al cargar vendedores'); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setErrors({}); setShowForm(true); };
-  const openEdit = (s: Seller) => { setEditing(s); setForm({ name: s.name, email: s.email, phone: s.phone || '', commissionPercentage: s.commissionPercentage, active: s.active }); setErrors({}); setShowForm(true); };
-
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!form.name?.trim()) e.name = 'Nombre obligatorio';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const save = async () => {
-    if (!validate()) return;
-    setSaving(true);
-    try {
-      if (editing) await api.sellers.update(editing.id, { ...form, id: editing.id });
-      else await api.sellers.create(form);
-      toast.success(editing ? 'Vendedor actualizado' : 'Vendedor creado');
-      setShowForm(false);
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = async (id: number) => {
-    if (!confirm('¿Eliminar este vendedor?')) return;
-    setDeleting(id);
-    try {
-      await api.sellers.remove(id);
-      toast.success('Vendedor eliminado');
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setDeleting(null);
-    }
-  };
-
-  const filtered = sellers.filter((s) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q);
-    const matchActivo = activoFilter === 'Todos' || (activoFilter === 'Activos' ? s.active : !s.active);
-    return matchSearch && matchActivo;
-  });
+  // Estado y acciones del slice, extraídos a features/sellers.
+  const {
+    filtered, loading, search, setSearch, activoFilter, setActivoFilter,
+    showForm, setShowForm, editing, form, setForm, errors,
+    saving, deleting, openCreate, openEdit, save, remove,
+  } = useSellers();
 
   const { sorted, sort, toggle } = useTableSort(filtered, {
     id: (s) => s.id,

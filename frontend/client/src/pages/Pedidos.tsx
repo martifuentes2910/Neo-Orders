@@ -1,18 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
-import { api } from '../api';
 import {
   ORDER_STATUSES,
-  estadosDestino,
   esEstadoBloqueado,
   getStatusColor,
   getStatusTextColor,
-  type Client,
-  type Order,
   type OrderStatus,
-  type Product,
-  type Seller,
 } from '../types';
+import { ordersFeatureApi, useOrders, esTerminal } from '@/features/orders';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -28,22 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import SortableTableHead from '@/components/SortableTableHead';
 import { useTableSort } from '@/hooks/useTableSort';
-import { toast } from 'sonner';
 import CsvImportDialog from '@/components/CsvImportDialog';
-
-let cachedOrders: Order[] | null = null;
-
-const esTerminal = (estado: OrderStatus) => estadosDestino(estado).length === 1;
-
-const emptyForm = {
-  clientId: 0,
-  sellerId: 0 as number | null,
-  productId: 0 as number | null,
-  productName: '',
-  cantidad: 1,
-  precioUnitario: 0,
-  estado: 'Pendiente' as OrderStatus,
-};
 
 export default function Pedidos() {
   const { formatMoney } = useSettings();
@@ -52,37 +31,19 @@ export default function Pedidos() {
   const isDark = resolved === 'oscuro';
   const { user } = useAuth();
   const isAdmin = user?.roles?.includes('Admin');
-  const [orders, setOrders] = useState<Order[]>(cachedOrders || []);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [sellers, setSellers] = useState<Seller[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(!cachedOrders);
-  const [search, setSearch] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState('Todos');
-  const [clientFilter, setClientFilter] = useState('');
-  const [sellerFilter, setSellerFilter] = useState('');
-  const [productFilter, setProductFilter] = useState('');
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Order | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<number | null>(null);
-  const [showImport, setShowImport] = useState(false);
-  // KAN-13: producto, nombre y precio son fijos cuando se edita un pedido.
-  const bloqueado = !!editing;
-  // KAN-16: Enviado/Entregado/Cancelado sólo permiten cambiar el estado.
-  const editingEstado: OrderStatus | null = editing ? (editing.estado as OrderStatus) : null;
-  const soloEstado = !!editingEstado && esEstadoBloqueado(editingEstado);
-  const opcionesEstado = editingEstado ? estadosDestino(editingEstado) : ORDER_STATUSES;
-  const productoDelCatalogo = products.find((p) => p.id === form.productId);
-  const productoDadoDeBaja = bloqueado && products.length > 0 && !productoDelCatalogo;
-  // La FK se pone en null al borrar el producto; hace falta un valor centinela válido para Radix.
-  const productSelectValue = productoDadoDeBaja && !form.productId
-    ? '__sin_catalogo__'
-    : (form.productId ? String(form.productId) : '');
+
+  // Estado y acciones del slice, extraídos a features/orders.
+  const {
+    orders, clients, sellers, products, loading,
+    search, setSearch, estadoFilter, setEstadoFilter,
+    clientFilter, setClientFilter, sellerFilter, setSellerFilter,
+    productFilter, setProductFilter, desde, setDesde, hasta, setHasta,
+    hasFilters, clearFilters,
+    showForm, setShowForm, editing, form, setForm, errors,
+    saving, deleting, showImport, setShowImport,
+    bloqueado, soloEstado, opcionesEstado, productoDadoDeBaja, productSelectValue,
+    onProductChange, openCreate, openEdit, save, remove, load,
+  } = useOrders();
 
   const { sorted, sort, toggle } = useTableSort(orders, {
     id: (o) => o.id,
@@ -95,165 +56,6 @@ export default function Pedidos() {
     estado: (o) => ORDER_STATUSES.indexOf(o.estado as OrderStatus),
     fecha: (o) => new Date(o.fecha).getTime(),
   });
-
-  const load = async () => {
-    if (!cachedOrders) setLoading(true);
-    try {
-      const data = await api.orders.list(
-        search,
-        estadoFilter,
-        clientFilter === '' ? undefined : Number(clientFilter),
-        sellerFilter === '' ? undefined : Number(sellerFilter),
-        productFilter === '' ? undefined : Number(productFilter),
-        desde || undefined,
-        hasta || undefined
-      );
-      cachedOrders = data;
-      setOrders(data);
-    } catch {
-      toast.error('Error al cargar pedidos');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estadoFilter, clientFilter, sellerFilter, productFilter, desde, hasta]);
-
-  const skipSearch = useRef(true);
-  useEffect(() => {
-    if (skipSearch.current) {
-      skipSearch.current = false;
-      return;
-    }
-    const t = setTimeout(() => load(), 300);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
-
-  useEffect(() => {
-    api.clients.list().then(setClients).catch(() => {});
-    api.sellers.list(true).then(setSellers).catch(() => {});
-    api.products.list().then(setProducts).catch(() => {});
-  }, []);
-
-  const hasFilters = !!(
-    search ||
-    estadoFilter !== 'Todos' ||
-    clientFilter ||
-    sellerFilter ||
-    productFilter ||
-    desde ||
-    hasta
-  );
-
-  const clearFilters = () => {
-    setSearch('');
-    setEstadoFilter('Todos');
-    setClientFilter('');
-    setSellerFilter('');
-    setProductFilter('');
-    setDesde('');
-    setHasta('');
-  };
-
-  const onProductChange = (id: string) => {
-    if (bloqueado) return;
-    const numId = id ? Number(id) : 0;
-    const p = products.find((x) => x.id === numId);
-    if (p) {
-      setForm((f) => ({
-        ...f,
-        productId: p.id,
-        productName: p.name,
-        precioUnitario: p.basePrice,
-      }));
-    } else {
-      setForm((f) => ({ ...f, productId: null }));
-    }
-  };
-
-  const openCreate = () => {
-    setEditing(null);
-    setForm({ ...emptyForm, clientId: clients[0]?.id || 0, sellerId: sellers[0]?.id || null });
-    setErrors({});
-    setShowForm(true);
-  };
-
-  const openEdit = (o: Order) => {
-    setEditing(o);
-    setForm({
-      clientId: o.clientId,
-      sellerId: o.sellerId ?? null,
-      productId: o.productId ?? null,
-      productName: o.productName,
-      cantidad: o.cantidad,
-      precioUnitario: o.precioUnitario,
-      estado: o.estado,
-    });
-    setErrors({});
-    setShowForm(true);
-  };
-
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!form.clientId) e.clientId = 'Seleccioná un cliente';
-    // KAN-16: en alta, el catálogo es la única fuente del producto.
-    if (!editing && !form.productId) e.productId = 'Seleccioná un producto del catálogo';
-    if (!form.cantidad || form.cantidad < 1) e.cantidad = 'Cantidad inválida';
-    if (!form.precioUnitario || form.precioUnitario <= 0) e.precioUnitario = 'Precio inválido';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const save = async () => {
-    if (!soloEstado && !validate()) return;
-    setSaving(true);
-    try {
-      if (soloEstado) {
-        await api.orders.updateStatus(editing!.id, form.estado);
-        toast.success('Estado actualizado');
-      } else {
-        const payload = {
-          clientId: form.clientId,
-          sellerId: form.sellerId,
-          productId: form.productId,
-          cantidad: form.cantidad,
-          precioUnitario: form.precioUnitario,
-          estado: editing ? form.estado : 'Pendiente',
-        };
-        if (editing) {
-          await api.orders.update(editing.id, { ...payload, id: editing.id });
-          toast.success('Pedido actualizado');
-        } else {
-          await api.orders.create(payload);
-          toast.success('Pedido creado');
-        }
-      }
-      setShowForm(false);
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = async (id: number) => {
-    if (!confirm('¿Eliminar este pedido?')) return;
-    setDeleting(id);
-    try {
-      await api.orders.remove(id);
-      toast.success('Pedido eliminado');
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setDeleting(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -409,9 +211,9 @@ export default function Pedidos() {
         open={showImport}
         onOpenChange={setShowImport}
         title="Importar pedidos desde CSV"
-        templateUrl={api.orders.templateUrl()}
+        templateUrl={ordersFeatureApi.templateUrl()}
         templateName="plantilla-pedidos.csv"
-        onImport={(file) => api.orders.importCsv(file)}
+        onImport={(file) => ordersFeatureApi.importCsv(file)}
         onImported={load}
       />
 
