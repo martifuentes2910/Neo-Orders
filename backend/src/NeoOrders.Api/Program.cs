@@ -34,6 +34,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Services
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderQueryService, OrderQueryService>();
+builder.Services.AddScoped<NeoOrders.Application.Contracts.Clients.IClientService, ClientService>();
 
 // Reportes: contratos en Application, implementaciones en Data (DIP).
 builder.Services.AddScoped<IReporteResumenRepository, ReporteResumenRepository>();

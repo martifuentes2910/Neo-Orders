@@ -1,11 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
-using NeoOrders.Application.Contracts.Orders;
-using NeoOrders.Application.Contracts.Notifications;
+using NeoOrders.Application.Contracts.Clients;
 using NeoOrders.Application.Contracts.Import;
+using NeoOrders.Application.DTOs.Clients;
 
 namespace NeoOrders.Api.Controllers;
 
@@ -14,63 +11,38 @@ namespace NeoOrders.Api.Controllers;
 [Authorize]
 public class ClientsController : ControllerBase
 {
-    private readonly AppDbContext _db;
+    private readonly IClientService _clients;
     private readonly ICsvImportService _csvImport;
-    public ClientsController(AppDbContext db, ICsvImportService csvImport) { _db = db; _csvImport = csvImport; }
+    public ClientsController(IClientService clients, ICsvImportService csvImport) { _clients = clients; _csvImport = csvImport; }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? search)
-    {
-        var q = _db.Clients.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.Trim().ToLower();
-            q = q.Where(c => c.Nombre.ToLower().Contains(s) || c.Email.ToLower().Contains(s));
-        }
-        var list = await q.OrderBy(c => c.Nombre).Select(c => new
-        {
-            c.Id,
-            c.Nombre,
-            c.Email,
-            c.Telefono,
-            c.Direccion,
-            c.FechaAlta,
-            OrdersCount = c.Orders.Count,
-            TotalSpent = c.Orders.Sum(o => (decimal?)o.Total) ?? 0m
-        }).ToListAsync();
-        return Ok(list);
-    }
+    public async Task<IActionResult> List([FromQuery] string? search) => Ok(await _clients.ListAsync(search));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
     {
-        var c = await _db.Clients.FindAsync(id);
+        var c = await _clients.GetByIdAsync(id);
         if (c == null) return NotFound();
         return Ok(c);
     }
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Create([FromBody] Client dto)
+    public async Task<IActionResult> Create([FromBody] ClientDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        _db.Clients.Add(dto);
-        await _db.SaveChangesAsync();
-        return CreatedAtAction(nameof(Get), new { id = dto.Id }, dto);
+        var created = await _clients.CreateAsync(dto);
+        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update(int id, [FromBody] Client dto)
+    public async Task<IActionResult> Update(int id, [FromBody] ClientDto dto)
     {
         if (id != dto.Id) return BadRequest();
-        var existing = await _db.Clients.FindAsync(id);
-        if (existing == null) return NotFound();
-        existing.Nombre = dto.Nombre;
-        existing.Email = dto.Email;
-        existing.Telefono = dto.Telefono;
-        existing.Direccion = dto.Direccion;
-        await _db.SaveChangesAsync();
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var ok = await _clients.UpdateAsync(id, dto);
+        if (!ok) return NotFound();
         return NoContent();
     }
 
@@ -78,11 +50,9 @@ public class ClientsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
-        var c = await _db.Clients.Include(x => x.Orders).FirstOrDefaultAsync(x => x.Id == id);
-        if (c == null) return NotFound();
-        if (c.Orders.Any()) return BadRequest(new { message = "El cliente tiene pedidos asociados" });
-        _db.Clients.Remove(c);
-        await _db.SaveChangesAsync();
+        var (ok, error) = await _clients.DeleteAsync(id);
+        if (!ok && error == "NOT_FOUND") return NotFound();
+        if (!ok) return BadRequest(new { message = error });
         return NoContent();
     }
 
