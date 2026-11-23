@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 
@@ -92,6 +94,109 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         await AssertBadRequestMessageAsync(response, MensajeExtensionInvalida);
     }
 
+    [Fact]
+    public async Task PostClientsImportCsv_Valido_Retorna200Resultado()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var email = $"csv.contract.client.{Guid.NewGuid():N}@test.local";
+        using var form = CreateForm(
+            "Name;Email;Phone;Address\n" +
+            $"Ana Perez;{email};600123456;Av. Central 1\n",
+            "clientes.csv");
+
+        var response = await auth.Client.PostAsync("/api/clients/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        AssertImportResultCounters(doc.RootElement, imported: 1);
+    }
+
+    [Fact]
+    public async Task PostClientsImportCsv_DuplicadoEnArchivo_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var email = $"csv.duplicate.{Guid.NewGuid():N}@test.local";
+        using var form = CreateForm(
+            "Name;Email;Phone;Address\n" +
+            $"Ana Perez;{email};600111111;Av. Central 1\n" +
+            $"Berta Perez;{email};600222222;Av. Central 2\n",
+            "clientes-duplicados.csv");
+
+        var response = await auth.Client.PostAsync("/api/clients/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "Email", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task PostProductsImportCsv_Valido_Retorna200Resultado()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var sku = $"SKU-CSV-{Guid.NewGuid():N}";
+        using var form = CreateForm(
+            "Sku;Name;Category;BasePrice;Cost;Stock;MinStockAlert;Active\n" +
+            $"{sku};Producto CSV;General;10.50;5.25;5;1;true\n",
+            "productos.csv");
+
+        var response = await auth.Client.PostAsync("/api/products/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        AssertImportResultCounters(doc.RootElement, imported: 1);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_ValidoConCatalogo_Retorna200Resultado()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productActive: true);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};1\n",
+            "pedidos.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        AssertImportResultCounters(doc.RootElement, imported: 1);
+
+        var persisted = await auth.QueryDbAsync(async db =>
+        {
+            var order = await db.Orders.SingleAsync(o => o.OrderNumber == orderNumber);
+            var product = await db.Products.SingleAsync(p => p.Id == productId);
+            return (order.Estado, product.Stock);
+        });
+        Assert.Equal("Pendiente", persisted.Estado);
+        Assert.Equal(5, persisted.Stock);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_ProductIdInactivo_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productActive: false);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};1\n",
+            "pedidos-producto-inactivo.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "ProductId", StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>
     /// Formulario multipart válido que no contiene el campo "file": un form
     /// vacío es serializado por HttpClient como una sección inválida.
@@ -131,5 +236,79 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
             $"Los errores no contienen 'file': {errors.GetRawText()}");
         Assert.Contains(fileErrors.EnumerateArray(), e =>
             e.GetString()?.Contains("file", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>
+        await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+
+    private static JsonElement GetProperty(JsonElement obj, string name)
+    {
+        if (obj.TryGetProperty(name, out var exact)) return exact;
+        foreach (var property in obj.EnumerateObject())
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                return property.Value;
+        throw new Xunit.Sdk.XunitException($"La respuesta JSON no contiene la propiedad '{name}'.");
+    }
+
+    private static void AssertImportResultCounters(JsonElement root, int imported)
+    {
+        Assert.True(GetProperty(root, "totalRows").GetInt32() >= 1);
+        Assert.Equal(imported, GetProperty(root, "validRows").GetInt32());
+        Assert.Equal(imported, GetProperty(root, "imported").GetInt32());
+        var errors = GetProperty(root, "errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.Empty(errors.EnumerateArray());
+    }
+
+    private static JsonElement[] AssertImportErrorsWithShape(JsonElement root)
+    {
+        var errors = GetProperty(root, "errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var items = errors.EnumerateArray().ToArray();
+        Assert.NotEmpty(items);
+        foreach (var error in items)
+        {
+            Assert.True(GetProperty(error, "row").TryGetInt32(out _));
+            Assert.False(string.IsNullOrWhiteSpace(GetProperty(error, "field").GetString()));
+            Assert.NotNull(GetProperty(error, "value").GetString());
+            Assert.False(string.IsNullOrWhiteSpace(GetProperty(error, "message").GetString()));
+        }
+        return items;
+    }
+
+    private static async Task<(int ClientId, int SellerId, int ProductId)> SeedCatalogAsync(
+        TestAuthClient auth, bool productActive)
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        return await auth.QueryDbAsync(async db =>
+        {
+            var client = new Client
+            {
+                Nombre = $"Cliente CSV {suffix}",
+                Email = $"csv.contract.client.{suffix}@test.local"
+            };
+            var seller = new Seller
+            {
+                Name = $"Vendedor CSV {suffix}",
+                Email = $"csv.contract.seller.{suffix}@test.local",
+                Active = true
+            };
+            var product = new Product
+            {
+                Sku = $"SKU-CSV-{suffix}",
+                Name = $"Producto CSV {suffix}",
+                Category = "General",
+                BasePrice = 10.50m,
+                Cost = 5.25m,
+                Stock = 5,
+                MinStockAlert = 1,
+                Active = productActive
+            };
+            db.Clients.Add(client);
+            db.Sellers.Add(seller);
+            db.Products.Add(product);
+            await db.SaveChangesAsync();
+            return (client.Id, seller.Id, product.Id);
+        });
     }
 }
