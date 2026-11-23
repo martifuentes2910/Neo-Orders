@@ -171,7 +171,11 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
-        db.Database.Migrate();
+        if (db.Database.IsRelational())
+            db.Database.Migrate();
+        else
+            db.Database.EnsureCreated();
+
         var seedOnStartup = builder.Configuration.GetValue<bool?>("Seed:RunOnStartup")
             ?? app.Environment.IsDevelopment();
         if (seedOnStartup)
@@ -208,3 +212,5 @@ app.MapGet("/api/antiforgery/token", (IAntiforgery antiforgery, HttpContext cont
 }).RequireAuthorization();
 
 app.Run();
+
+public partial class Program { }
