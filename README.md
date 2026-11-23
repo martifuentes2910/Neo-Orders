@@ -65,7 +65,7 @@ El frontend queda disponible en `http://localhost:5173`.
 
 ## Despliegue Azure + GitHub
 
-Ver `AZURE_DEPLOY_PLAN.md` para el plan por bloques y checklist.
+Plan detallado y guías operativas: ver carpeta `docs/` (administrada localmente, ignorada por git).
 
 Resumen objetivo:
 - Frontend: Azure Static Web Apps.
