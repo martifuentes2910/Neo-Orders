@@ -147,9 +147,10 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
 
                 // TestServer corre sobre HTTP; en Testing la cookie antiforgery es Always.
                 // TestServer usa HTTP; en Testing la cookie antiforgery es Always.
+                // Se relaja la pol?tica de cookie para el harness. No se deshabilita
+                // AutoValidateAntiforgeryToken: los requests con esquema Test (header,
+                // no cookie) quedan fuera de la validaci?n antiforgery por dise?o.
                 services.PostConfigure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest);
-                // Compatibilidad para smoke tests con esquema Test (header).
-                services.PostConfigure<MvcOptions>(o => o.Filters.Add(new IgnoreAntiforgeryTokenAttribute()));
 
                                 // Los clientes con auth por esquema Test (header) no usan cookie auth;
                 // AutoValidateAntiforgeryToken no aplica a auth no-cookie, pero el entorno
