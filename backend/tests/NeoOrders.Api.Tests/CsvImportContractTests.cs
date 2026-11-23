@@ -73,6 +73,17 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task PostClientsImportCsv_ExtensionInvalida_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        using var form = CreateForm("Name;Email\nAna;ana@test.local\n", "datos.txt");
+
+        var response = await auth.Client.PostAsync("/api/clients/import-csv", form);
+
+        await AssertBadRequestMessageAsync(response, MensajeExtensionInvalida);
+    }
+
+    [Fact]
     public async Task PostOrdersImportCsv_SinArchivo_Retorna400ConErrorDeValidacion()
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
@@ -197,6 +208,51 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
             string.Equals(GetProperty(e, "field").GetString(), "ProductId", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task PostOrdersImportCsv_SellerIdInactivo_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productActive: true, sellerActive: false);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};1\n",
+            "pedidos-vendedor-inactivo.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "SellerId", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("inactivo", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_OrderNumberDuplicadoEnDb_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productActive: true);
+        const string orderNumber = "DUP-001";
+        await SeedExistingOrderAsync(auth, clientId, sellerId, productId, orderNumber);
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};1\n",
+            "pedidos-duplicados.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "OrderNumber", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("existe", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
     /// <summary>
     /// Formulario multipart válido que no contiene el campo "file": un form
     /// vacío es serializado por HttpClient como una sección inválida.
@@ -276,8 +332,29 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         return items;
     }
 
+    private static async Task<int> SeedExistingOrderAsync(
+        TestAuthClient auth, int clientId, int sellerId, int productId, string orderNumber) =>
+        await auth.QueryDbAsync(async db =>
+        {
+            var order = new Order
+            {
+                OrderNumber = orderNumber,
+                ClientId = clientId,
+                SellerId = sellerId,
+                ProductId = productId,
+                ProductName = "Pedido existente CSV",
+                Cantidad = 1,
+                PrecioUnitario = 10.50m,
+                Total = 10.50m,
+                Estado = "Pendiente"
+            };
+            db.Orders.Add(order);
+            await db.SaveChangesAsync();
+            return order.Id;
+        });
+
     private static async Task<(int ClientId, int SellerId, int ProductId)> SeedCatalogAsync(
-        TestAuthClient auth, bool productActive)
+        TestAuthClient auth, bool productActive, bool sellerActive = true)
     {
         var suffix = Guid.NewGuid().ToString("N");
         return await auth.QueryDbAsync(async db =>
@@ -291,7 +368,7 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
             {
                 Name = $"Vendedor CSV {suffix}",
                 Email = $"csv.contract.seller.{suffix}@test.local",
-                Active = true
+                Active = sellerActive
             };
             var product = new Product
             {
