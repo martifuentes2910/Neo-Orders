@@ -31,7 +31,7 @@ public class ConfigService : IConfigService
 
     public Task SeedAsync(IServiceProvider sp) => DbSeeder.SeedAsync(sp);
 
-    public async Task<object> ClearAsync()
+    public async Task<ClearDataResultDto> ClearAsync()
     {
         var notifications = await _db.Notifications.CountAsync();
         var orders = await _db.Orders.CountAsync();
@@ -46,10 +46,17 @@ public class ConfigService : IConfigService
         _db.Clients.RemoveRange(_db.Clients);
         await _db.SaveChangesAsync();
 
-        return new
+        return new ClearDataResultDto
         {
-            message = "Datos operativos eliminados",
-            eliminados = new { notificaciones = notifications, pedidos = orders, productos = products, vendedores = sellers, clientes = clients }
+            Message = "Datos operativos eliminados",
+            Eliminados = new ClearDataCountsDto
+            {
+                Notificaciones = notifications,
+                Pedidos = orders,
+                Productos = products,
+                Vendedores = sellers,
+                Clientes = clients
+            }
         };
     }
 

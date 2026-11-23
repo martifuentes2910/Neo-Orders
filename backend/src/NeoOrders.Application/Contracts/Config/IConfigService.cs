@@ -7,5 +7,5 @@ public interface IConfigService
     Task<CompanySettingsDto> GetCompanyAsync();
     Task<CompanySettingsDto> UpdateCompanyAsync(CompanySettingsDto dto);
     Task SeedAsync(IServiceProvider sp);
-    Task<object> ClearAsync();
+    Task<ClearDataResultDto> ClearAsync();
 }
