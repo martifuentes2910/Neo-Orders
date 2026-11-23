@@ -565,7 +565,7 @@ function DatosTab() {
       const r = await api.config.seed();
       setMsg(r.message || 'Datos verificados');
       toast.success(r.message || 'Datos verificados');
-    } catch (e: any) {
+    } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error inesperado';
       setMsg(msg);
       toast.error(msg);

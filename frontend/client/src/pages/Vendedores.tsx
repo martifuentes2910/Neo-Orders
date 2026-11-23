@@ -17,7 +17,7 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'framer-motion';
 
-let cachedVendedores: any[] | null = null;
+let cachedVendedores: Seller[] | null = null;
 
 const emptyForm = { name: '', email: '', phone: '', commissionPercentage: 5, active: true };
 
