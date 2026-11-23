@@ -397,6 +397,50 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Contains(doc.RootElement.EnumerateArray(), o => GetProperty(o, "id").GetInt32() == orderId);
     }
 
+    [Fact]
+    public async Task PostOrder_ProductIdInexistente_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, _) = await SeedCatalogAsync(auth);
+        var missingProductId = await auth.QueryDbAsync(async db =>
+            (await db.Products.Select(p => p.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+
+        var response = await PostOrderAsync(auth.Client, clientId, sellerId, missingProductId);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Producto no válido", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
+    public async Task PostOrder_VendedorInexistente_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var clientId = await SeedClientAsync(auth);
+        var productId = await SeedProductAsync(auth);
+        var missingSellerId = await auth.QueryDbAsync(async db =>
+            (await db.Sellers.Select(s => s.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+
+        var response = await PostOrderAsync(auth.Client, clientId, missingSellerId, productId);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Vendedor no válido", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
+    public async Task GetOrderStatuses_ConAuth_Retorna200Array()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+
+        var response = await auth.Client.GetAsync("/api/orders/statuses");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Contains("Pendiente", doc.RootElement.EnumerateArray().Select(s => s.GetString()).ToList());
+    }
+
     private static Task<HttpResponseMessage> PatchStatusAsync(HttpClient client, int orderId, string estado) =>
         client.PatchAsJsonAsync($"/api/orders/{orderId}/estado", new { estado });
 

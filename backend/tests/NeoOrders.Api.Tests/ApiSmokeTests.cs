@@ -108,8 +108,9 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
     public TestAuthClient CreateClientWithTestAuth(
         string? userId = null,
         string? name = null,
-        IEnumerable<string>? roles = null) =>
-        CreateTestClient(disableAntiforgery: true, userId, name, roles);
+        IEnumerable<string>? roles = null,
+        Action<IServiceCollection>? configureServices = null) =>
+        CreateTestClient(disableAntiforgery: true, userId, name, roles, configureServices);
 
     /// <summary>
     /// Cliente con auth de prueba y validaci?n antiforgery real habilitada.
@@ -119,13 +120,14 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
         string? userId = null,
         string? name = null,
         IEnumerable<string>? roles = null) =>
-        CreateTestClient(disableAntiforgery: false, userId, name, roles);
+        CreateTestClient(disableAntiforgery: false, userId, name, roles, configureServices: null);
 
     private TestAuthClient CreateTestClient(
         bool disableAntiforgery,
         string? userId,
         string? name,
-        IEnumerable<string>? roles)
+        IEnumerable<string>? roles,
+        Action<IServiceCollection>? configureServices)
     {
         var factory = WithWebHostBuilder(builder =>
         {
@@ -159,6 +161,10 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
                 // en esta factory derivada de tests.
                 services.PostConfigure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest);
                 services.PostConfigure<MvcOptions>(o => o.Filters.Add(new IgnoreAntiforgeryTokenAttribute()));
+
+                // Gancho para tests de contrato: permite sustituir un servicio con un stub
+                // (p. ej. simular un UNIQUE o una excepción no manejada) sin tocar el producto.
+                configureServices?.Invoke(services);
             });
         });
 

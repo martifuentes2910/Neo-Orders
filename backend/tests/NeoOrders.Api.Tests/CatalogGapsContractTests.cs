@@ -139,6 +139,57 @@ public class CatalogGapsContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Contains(secondCategory, categories);
     }
 
+    [Fact]
+    public async Task GetClients_ConAuth_Retorna200Array()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var suffix = Guid.NewGuid().ToString("N");
+        var clientId = await SeedClientForListAsync(auth, suffix);
+
+        var response = await auth.Client.GetAsync("/api/clients");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        var client = Assert.Single(doc.RootElement.EnumerateArray(),
+            c => GetProperty(c, "id").GetInt32() == clientId);
+        Assert.Equal($"cliente.lista.{suffix}@test.local", GetProperty(client, "email").GetString());
+        Assert.Equal(0, GetProperty(client, "ordersCount").GetInt32());
+        Assert.Equal(0m, GetProperty(client, "totalSpent").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GetSellers_ConAuth_Retorna200ArrayIncluyeInactivos()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var suffix = Guid.NewGuid().ToString("N");
+        var (activeName, inactiveName) = await SeedSellersAsync(auth, suffix);
+
+        var response = await auth.Client.GetAsync("/api/sellers");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        var names = doc.RootElement.EnumerateArray()
+            .Select(s => GetProperty(s, "name").GetString())
+            .ToArray();
+        Assert.Contains(activeName, names);
+        Assert.Contains(inactiveName, names);
+    }
+
+    private static Task<int> SeedClientForListAsync(TestAuthClient auth, string suffix) =>
+        auth.QueryDbAsync(async db =>
+        {
+            var client = new Client
+            {
+                Nombre = $"Cliente lista {suffix}",
+                Email = $"cliente.lista.{suffix}@test.local"
+            };
+            db.Clients.Add(client);
+            await db.SaveChangesAsync();
+            return client.Id;
+        });
+
     private static async Task<(int ActiveId, int InactiveId)> SeedProductsAsync(
         TestAuthClient auth, string suffix, decimal activeBasePrice, decimal inactiveBasePrice)
     {
