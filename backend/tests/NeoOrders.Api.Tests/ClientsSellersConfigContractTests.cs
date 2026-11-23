@@ -155,6 +155,161 @@ public class ClientsSellersConfigContractTests : IClassFixture<NeoOrdersApiFacto
         Assert.Equal("No autenticado.", GetProperty(doc.RootElement, "message").GetString());
     }
 
+    [Fact]
+    public async Task PutClient_Valido_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var clientId = await SeedClientAsync(auth);
+        var suffix = Guid.NewGuid().ToString("N");
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/clients/{clientId}", ClientPayload(clientId, suffix));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var persisted = await auth.QueryDbAsync(async db =>
+        {
+            var client = await db.Clients.FindAsync(clientId);
+            return (Nombre: client!.Nombre, Email: client.Email);
+        });
+        Assert.Equal($"Cliente contrato {suffix}", persisted.Nombre);
+        Assert.Equal($"cliente.contrato.{suffix}@test.local", persisted.Email);
+    }
+
+    [Fact]
+    public async Task DeleteClient_Existente_Admin_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var clientId = await SeedClientAsync(auth);
+
+        var response = await auth.Client.DeleteAsync($"/api/clients/{clientId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.False(await auth.QueryDbAsync(async db => await db.Clients.AnyAsync(c => c.Id == clientId)));
+    }
+
+    [Fact]
+    public async Task PutSeller_Valido_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var sellerId = await SeedSellerAsync(auth);
+        var suffix = Guid.NewGuid().ToString("N");
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/sellers/{sellerId}", SellerPayload(sellerId, suffix));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var persisted = await auth.QueryDbAsync(async db =>
+        {
+            var seller = await db.Sellers.FindAsync(sellerId);
+            return (Name: seller!.Name, Email: seller.Email, Commission: seller.CommissionPercentage);
+        });
+        Assert.Equal($"Vendedor contrato {suffix}", persisted.Name);
+        Assert.Equal($"vendedor.contrato.{suffix}@test.local", persisted.Email);
+        Assert.Equal(5m, persisted.Commission);
+    }
+
+    [Fact]
+    public async Task DeleteSeller_Existente_Admin_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var sellerId = await SeedSellerAsync(auth);
+
+        var response = await auth.Client.DeleteAsync($"/api/sellers/{sellerId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.False(await auth.QueryDbAsync(async db => await db.Sellers.AnyAsync(s => s.Id == sellerId)));
+    }
+
+    [Fact]
+    public async Task GetClientById_Existente_Retorna200()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var clientId = await SeedClientAsync(auth);
+
+        var response = await auth.Client.GetAsync($"/api/clients/{clientId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(clientId, GetProperty(doc.RootElement, "id").GetInt32());
+    }
+
+    [Fact]
+    public async Task PutConfigProfile_UsuarioValido_Retorna200Shape()
+    {
+        var userId = $"config-profile-put-user-{Guid.NewGuid():N}";
+        using var auth = _factory.CreateClientWithTestAuth(userId: userId);
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = userId,
+            UserName = $"{userId}@test.local",
+            Email = $"{userId}@test.local",
+            EmailConfirmed = true,
+            Nombre = "Ana",
+            Apellido = "Prueba",
+            Avatar = "avatar-2",
+            Tema = "claro",
+            Paleta = "coral"
+        }, "Empleado");
+
+        var response = await auth.Client.PutAsJsonAsync("/api/config/profile", new
+        {
+            nombre = "María",
+            apellido = "Actualizada",
+            avatar = "avatar-4",
+            tema = "oscuro",
+            paleta = "verde"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        Assert.Equal(userId, GetProperty(root, "id").GetString());
+        Assert.Equal($"{userId}@test.local", GetProperty(root, "email").GetString());
+        Assert.Equal("María", GetProperty(root, "nombre").GetString());
+        Assert.Equal("Actualizada", GetProperty(root, "apellido").GetString());
+        Assert.Equal("avatar-4", GetProperty(root, "avatar").GetString());
+        Assert.Equal("oscuro", GetProperty(root, "tema").GetString());
+        Assert.Equal("verde", GetProperty(root, "paleta").GetString());
+        var roles = GetProperty(root, "roles");
+        Assert.Equal(JsonValueKind.Array, roles.ValueKind);
+        Assert.Contains("Empleado", roles.EnumerateArray().Select(role => role.GetString()).ToList());
+    }
+
+    private static Task<int> SeedClientAsync(TestAuthClient auth)
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        return auth.QueryDbAsync(async db =>
+        {
+            var client = new Client
+            {
+                Nombre = $"Cliente contrato {suffix}",
+                Email = $"cliente.contrato.{suffix}@test.local",
+                Telefono = "123456789",
+                Direccion = "Calle Contrato 1"
+            };
+            db.Clients.Add(client);
+            await db.SaveChangesAsync();
+            return client.Id;
+        });
+    }
+
+    private static Task<int> SeedSellerAsync(TestAuthClient auth)
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        return auth.QueryDbAsync(async db =>
+        {
+            var seller = new Seller
+            {
+                Name = $"Vendedor contrato {suffix}",
+                Email = $"vendedor.contrato.{suffix}@test.local",
+                Phone = "987654321",
+                CommissionPercentage = 5m,
+                Active = true
+            };
+            db.Sellers.Add(seller);
+            await db.SaveChangesAsync();
+            return seller.Id;
+        });
+    }
+
     private static object ClientPayload(int id, string suffix) => new
     {
         id,

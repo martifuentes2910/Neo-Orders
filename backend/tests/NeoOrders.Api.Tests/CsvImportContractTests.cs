@@ -392,6 +392,38 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
             && GetProperty(e, "message").GetString()?.Contains("no existe", StringComparison.OrdinalIgnoreCase) == true);
     }
 
+    [Fact]
+    public async Task PostClientsImportCsv_HeadersFaltantes_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        using var form = CreateForm("Name;Email\nAna;ana@test.local\n", "clientes-sin-columnas.csv");
+
+        var response = await auth.Client.PostAsync("/api/clients/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "header", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("Faltan columnas requeridas", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task PostProductsImportCsv_ArchivoVacio_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        using var form = CreateForm("\n", "productos-vacio.csv");
+
+        var response = await auth.Client.PostAsync("/api/products/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "file", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("vacío", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
     /// <summary>
     /// Formulario multipart válido que no contiene el campo "file": un form
     /// vacío es serializado por HttpClient como una sección inválida.

@@ -95,6 +95,80 @@ public class ProductsContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PutProduct_Valido_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var productId = await SeedProductAsync(auth);
+        var suffix = Guid.NewGuid().ToString("N");
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/products/{productId}", ValidProductPayload(productId, suffix));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var persisted = await auth.QueryDbAsync(async db =>
+        {
+            var product = await db.Products.FindAsync(productId);
+            return (Sku: product!.Sku, Name: product.Name, Stock: product.Stock);
+        });
+        Assert.Equal($"SKU-PRODUCT-UPDATE-{suffix}", persisted.Sku);
+        Assert.Equal($"Producto actualizado {suffix}", persisted.Name);
+        Assert.Equal(7, persisted.Stock);
+    }
+
+    [Fact]
+    public async Task DeleteProduct_Existente_Admin_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var productId = await SeedProductAsync(auth);
+
+        var response = await auth.Client.DeleteAsync($"/api/products/{productId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.False(await auth.QueryDbAsync(async db => await db.Products.AnyAsync(p => p.Id == productId)));
+    }
+
+    [Fact]
+    public async Task GetProductById_Existente_Retorna200()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var productId = await SeedProductAsync(auth);
+        var sku = await auth.QueryDbAsync(async db => (await db.Products.FindAsync(productId))!.Sku);
+
+        var response = await auth.Client.GetAsync($"/api/products/{productId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(productId, GetProperty(doc.RootElement, "id").GetInt32());
+        Assert.Equal(sku, GetProperty(doc.RootElement, "sku").GetString());
+    }
+
+    [Fact]
+    public async Task GetProducts_ConAuth_Retorna200Array()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var productId = await SeedProductAsync(auth);
+
+        var response = await auth.Client.GetAsync("/api/products");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Contains(doc.RootElement.EnumerateArray(), p => GetProperty(p, "id").GetInt32() == productId);
+    }
+
+    private static object ValidProductPayload(int id, string suffix) => new
+    {
+        id,
+        sku = $"SKU-PRODUCT-UPDATE-{suffix}",
+        name = $"Producto actualizado {suffix}",
+        category = "General",
+        basePrice = 12.50m,
+        cost = 6.25m,
+        stock = 7,
+        minStockAlert = 2,
+        active = true
+    };
+
     private static object CreateProductDto(int id) => new
     {
         id,

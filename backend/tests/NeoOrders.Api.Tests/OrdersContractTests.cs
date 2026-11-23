@@ -294,6 +294,112 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal("Estado no válido", GetProperty(doc.RootElement, "message").GetString());
     }
 
+    [Fact]
+    public async Task PutOrder_PendienteValido_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productStock: 5);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        // Pendiente no está en EditLocked: UpdateAsync aplica los campos editables.
+        var response = await auth.Client.PutAsJsonAsync($"/api/orders/{orderId}", new
+        {
+            id = orderId,
+            clientId,
+            sellerId,
+            productId,
+            productName = "Producto Contrato",
+            cantidad = 2,
+            precioUnitario = 10.50m,
+            estado = "Pendiente"
+        });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var persisted = await auth.QueryDbAsync(async db =>
+        {
+            var order = await db.Orders.FindAsync(orderId);
+            return (Cantidad: order!.Cantidad, Estado: order.Estado, Total: order.Total);
+        });
+        Assert.Equal(2, persisted.Cantidad);
+        Assert.Equal("Pendiente", persisted.Estado);
+        Assert.Equal(21.00m, persisted.Total);
+    }
+
+    [Fact]
+    public async Task PatchOrderStatus_ProcesadoAEnviado_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productStock: 5);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        var procesado = await PatchStatusAsync(auth.Client, orderId, "Procesado");
+        Assert.Equal(HttpStatusCode.NoContent, procesado.StatusCode);
+
+        var response = await PatchStatusAsync(auth.Client, orderId, "Enviado");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var estado = await auth.QueryDbAsync(async db => (await db.Orders.FindAsync(orderId))!.Estado);
+        Assert.Equal("Enviado", estado);
+    }
+
+    [Fact]
+    public async Task PatchOrderStatus_EnviadoAEntregado_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productStock: 5);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await PatchStatusAsync(auth.Client, orderId, "Procesado")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PatchStatusAsync(auth.Client, orderId, "Enviado")).StatusCode);
+
+        var response = await PatchStatusAsync(auth.Client, orderId, "Entregado");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var estado = await auth.QueryDbAsync(async db => (await db.Orders.FindAsync(orderId))!.Estado);
+        Assert.Equal("Entregado", estado);
+    }
+
+    [Fact]
+    public async Task PatchOrderStatus_ProcesadoACancelado_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productStock: 5);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId, cantidad: 2);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await PatchStatusAsync(auth.Client, orderId, "Procesado")).StatusCode);
+
+        var response = await PatchStatusAsync(auth.Client, orderId, "Cancelado");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var persisted = await auth.QueryDbAsync(async db =>
+        {
+            var order = await db.Orders.FindAsync(orderId);
+            var product = await db.Products.FindAsync(productId);
+            return (Estado: order!.Estado, Stock: product!.Stock);
+        });
+        Assert.Equal("Cancelado", persisted.Estado);
+        // El reembolso devuelve las 2 unidades descontadas al procesar.
+        Assert.Equal(5, persisted.Stock);
+    }
+
+    [Fact]
+    public async Task GetOrders_ConAuth_Retorna200Array()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        var response = await auth.Client.GetAsync("/api/orders");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Contains(doc.RootElement.EnumerateArray(), o => GetProperty(o, "id").GetInt32() == orderId);
+    }
+
+    private static Task<HttpResponseMessage> PatchStatusAsync(HttpClient client, int orderId, string estado) =>
+        client.PatchAsJsonAsync($"/api/orders/{orderId}/estado", new { estado });
+
     private static async Task<(int ClientId, int SellerId, int ProductId)> SeedCatalogAsync(
         TestAuthClient auth, int productStock = 5)
     {
