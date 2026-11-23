@@ -56,4 +56,12 @@ public class ConfiguracionController : ControllerBase
         await _config.SeedAsync(HttpContext.RequestServices);
         return Ok(new { message = "Datos de ejemplo verificados/cargados" });
     }
+
+    [HttpPost("clear")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Clear()
+    {
+        var result = await _config.ClearAsync();
+        return Ok(result);
+    }
 }

@@ -8,6 +8,7 @@ import type {
 } from './types/reportes';
 import type {
   Client,
+  CompanySettings,
   CsvImportResult,
   NotificationsSummary,
   Order,
@@ -235,15 +236,15 @@ export const api = {
 
   config: {
     empresa: {
-      get: () => request<any>('/config/company'),
-      update: (data: any) => request<any>('/config/company', { method: 'PUT', body: JSON.stringify(data) }),
+      get: () => request<CompanySettings>('/config/company'),
+      update: (data: Partial<CompanySettings>) => request<CompanySettings>('/config/company', { method: 'PUT', body: JSON.stringify(data) }),
     },
     perfil: {
-      get: () => request<any>('/config/profile'),
-      update: (data: any) => request<any>('/config/profile', { method: 'PUT', body: JSON.stringify(data) }),
+      get: () => request<User>('/config/profile'),
+      update: (data: Partial<User>) => request<User>('/config/profile', { method: 'PUT', body: JSON.stringify(data) }),
     },
-    seed: () => request<any>('/config/seed', { method: 'POST' }),
-    clear: () => request<any>('/config/clear', { method: 'POST' }),
+    seed: () => request<{ message: string }>('/config/seed', { method: 'POST' }),
+    clear: () => request<{ message: string; eliminados: Record<string, number> }>('/config/clear', { method: 'POST' }),
   },
 
   users: {
