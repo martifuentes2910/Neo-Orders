@@ -216,6 +216,19 @@ public sealed class TestAuthClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Ejecuta una consulta (o siembra) sobre el AppDbContext InMemory de este
+    /// factory derivado. CreateClientWithTestAuth crea una factory propia con su
+    /// propia DB aislada: usar su scope garantiza que los datos sembrados sean
+    /// los mismos que ve el HttpClient de este cliente.
+    /// </summary>
+    public async Task<T> QueryDbAsync<T>(Func<AppDbContext, Task<T>> query)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await query(db);
+    }
+
     public void Dispose()
     {
         Client.Dispose();
