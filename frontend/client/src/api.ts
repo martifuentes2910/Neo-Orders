@@ -1,12 +1,4 @@
 import type {
-  ClientesComprasResponse,
-  DashboardMetricsResponse,
-  FiltrosReporteParams,
-  ProductosVendidosResponse,
-  ReporteResumenResponse,
-  VentasVendedorResponse,
-} from './types/reportes';
-import type {
   AppNotification,
   Client,
   CompanySettings,
@@ -19,103 +11,17 @@ import type {
   Seller,
   User,
 } from './types';
+import type { FiltrosReporteParams } from './types/reportes';
+import { BASE, request } from './api/http';
+import { dashboardApi, reportsApi } from './api/reports';
 
-export type { CsvImportError, CsvImportResult, PriceAdjustmentItem, PriceAdjustmentPreviewResponse, PriceAdjustmentApplyResponse } from './types';
-
-const BASE =
-  (import.meta.env?.VITE_API_URL as string | undefined) ||
-  (typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:5286/api`
-    : 'http://localhost:5286/api');
-
-let csrfToken: string | null = null;
-
-async function fetchCsrfToken(): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE.replace('/api', '')}/api/antiforgery/token`, {
-      credentials: 'include',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    csrfToken = data.token;
-    return csrfToken;
-  } catch {
-    return null;
-  }
-}
-
-async function ensureCsrf(): Promise<string | null> {
-  if (csrfToken) return csrfToken;
-  return fetchCsrfToken();
-}
-
-async function handle<T>(res: Response): Promise<T> {
-  if (res.status === 401) {
-    throw new Error('UNAUTHORIZED');
-  }
-  if (!res.ok) {
-    let message = `Error ${res.status}`;
-    let body: unknown = null;
-    try {
-      body = await res.json();
-      const b = body as Record<string, unknown> | null;
-      const errors = b?.errors;
-      if (typeof b?.message === 'string') message = b.message;
-      else if (Array.isArray(errors) && (errors[0] as Record<string, unknown> | undefined)?.row) message = 'El archivo contiene errores de validación.';
-      else if (errors && typeof errors === 'object' && !Array.isArray(errors)) message = Object.values(errors as Record<string, unknown[]>).flat().join(' ');
-      else if (typeof b?.title === 'string') message = b.title;
-    } catch {
-      /* ignore */
-    }
-    const err = new Error(message) as Error & { body?: unknown };
-    if (body) err.body = body;
-    throw err;
-  }
-  if (res.status === 204) return undefined as T;
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return res.json();
-  return undefined as T;
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const method = (options.method || 'GET').toUpperCase();
-  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  const headers: Record<string, string> = {
-    // KAN-23: con FormData el navegador debe fijar el boundary del multipart.
-    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-    ...(options.headers as Record<string, string>),
-  };
-  if (method !== 'GET' && method !== 'HEAD') {
-    const t = await ensureCsrf();
-    if (t) headers['X-XSRF-TOKEN'] = t;
-  }
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
-  if (res.status === 400 && method !== 'GET') {
-    csrfToken = null;
-    const t = await fetchCsrfToken();
-    if (t) headers['X-XSRF-TOKEN'] = t;
-    const res2 = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
-    return handle<T>(res2);
-  }
-  return handle<T>(res);
-}
-
-function buildReporteQuery(filtros?: FiltrosReporteParams): string {
-  const params = new URLSearchParams();
-  if (filtros?.desde) params.set('desde', filtros.desde);
-  if (filtros?.hasta) params.set('hasta', filtros.hasta);
-  if (filtros?.clientId) params.set('clientId', String(filtros.clientId));
-  if (filtros?.sellerId) params.set('sellerId', String(filtros.sellerId));
-  if (filtros?.estado && filtros.estado !== 'Todos') params.set('estado', filtros.estado);
-  if (filtros?.page && filtros.page !== 1) params.set('page', String(filtros.page));
-  if (filtros?.pageSize && filtros.pageSize !== 25) params.set('pageSize', String(filtros.pageSize));
-  const qs = params.toString();
-  return qs ? `?${qs}` : '';
-}
+export type {
+  CsvImportError,
+  CsvImportResult,
+  PriceAdjustmentItem,
+  PriceAdjustmentPreviewResponse,
+  PriceAdjustmentApplyResponse,
+} from './types';
 
 export const api = {
   login: (email: string, password: string) =>
@@ -144,7 +50,7 @@ export const api = {
       sellerId?: number,
       productId?: number,
       desde?: string,
-      hasta?: string
+      hasta?: string,
     ) => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
@@ -157,10 +63,27 @@ export const api = {
       const qs = params.toString();
       return request<Order[]>(`/orders${qs ? '?' + qs : ''}`);
     },
-    create: (data: Pick<Order, 'clientId' | 'cantidad'> & { sellerId?: number | null; productId?: number | null; productName?: string; precioUnitario?: number; orderNumber?: string | null }) => request<{ id: number }>('/orders', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: Pick<Order, 'id' | 'clientId' | 'cantidad' | 'estado'> & { sellerId?: number | null; productId?: number | null; productName?: string; precioUnitario?: number }) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    // KAN-16: único camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
-    updateStatus: (id: number, estado: string) => request<void>(`/orders/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
+    create: (
+      data: Pick<Order, 'clientId' | 'cantidad'> & {
+        sellerId?: number | null;
+        productId?: number | null;
+        productName?: string;
+        precioUnitario?: number;
+        orderNumber?: string | null;
+      },
+    ) => request<{ id: number }>('/orders', { method: 'POST', body: JSON.stringify(data) }),
+    update: (
+      id: number,
+      data: Pick<Order, 'id' | 'clientId' | 'cantidad' | 'estado'> & {
+        sellerId?: number | null;
+        productId?: number | null;
+        productName?: string;
+        precioUnitario?: number;
+      },
+    ) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    // KAN-16: ?nico camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
+    updateStatus: (id: number, estado: string) =>
+      request<void>(`/orders/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
     remove: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
     templateUrl: () => `${BASE}/orders/import-csv/template`,
     importCsv: (file: File) => {
@@ -183,7 +106,8 @@ export const api = {
     },
     categories: () => request<string[]>('/products/categories'),
     create: (data: Partial<Product>) => request<Product>('/products', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: Partial<Product>) => request<void>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Product>) =>
+      request<void>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     // KAN-23: la imagen se sube en un endpoint dedicado para no cambiar el contrato JSON.
     uploadImage: (id: number, file: File) => {
       const body = new FormData();
@@ -217,30 +141,25 @@ export const api = {
     remove: (id: number) => request<void>(`/sellers/${id}`, { method: 'DELETE' }),
   },
 
-  dashboard: {
-    metricas: () => request<DashboardMetricsResponse>('/dashboard/metrics'),
-  },
+  dashboard: dashboardApi,
 
   notifications: {
     list: (take = 60) => request<{ items: AppNotification[]; resumen: NotificationsSummary }>(`/notifications?take=${take}`),
   },
 
-  reports: (filtros?: FiltrosReporteParams) =>
-    request<ReporteResumenResponse>(`/reports${buildReporteQuery(filtros)}`),
+  reports: (filtros?: FiltrosReporteParams) => reportsApi.resumen(filtros),
 
   reportesDetalle: {
-    vendedores: (filtros?: FiltrosReporteParams) =>
-      request<VentasVendedorResponse>(`/reports/ventas-vendedor${buildReporteQuery(filtros)}`),
-    productos: (filtros?: FiltrosReporteParams) =>
-      request<ProductosVendidosResponse>(`/reports/productos-vendidos${buildReporteQuery(filtros)}`),
-    clientes: (filtros?: FiltrosReporteParams) =>
-      request<ClientesComprasResponse>(`/reports/clientes-compras${buildReporteQuery(filtros)}`),
+    vendedores: (filtros?: FiltrosReporteParams) => reportsApi.detalle.vendedores(filtros),
+    productos: (filtros?: FiltrosReporteParams) => reportsApi.detalle.productos(filtros),
+    clientes: (filtros?: FiltrosReporteParams) => reportsApi.detalle.clientes(filtros),
   },
 
   config: {
     empresa: {
       get: () => request<CompanySettings>('/config/company'),
-      update: (data: Partial<CompanySettings>) => request<CompanySettings>('/config/company', { method: 'PUT', body: JSON.stringify(data) }),
+      update: (data: Partial<CompanySettings>) =>
+        request<CompanySettings>('/config/company', { method: 'PUT', body: JSON.stringify(data) }),
     },
     perfil: {
       get: () => request<User>('/config/profile'),
@@ -252,7 +171,8 @@ export const api = {
 
   users: {
     list: () => request<User[]>('/users'),
-    create: (data: { nombre: string; apellido: string; email: string; password: string; rol: string; avatar?: string }) => request<{ id: string; email: string }>('/users', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: { nombre: string; apellido: string; email: string; password: string; rol: string; avatar?: string }) =>
+      request<{ id: string; email: string }>('/users', { method: 'POST', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
   },
 };
