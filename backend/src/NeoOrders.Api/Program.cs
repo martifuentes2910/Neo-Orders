@@ -36,6 +36,7 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderQueryService, OrderQueryService>();
 builder.Services.AddScoped<NeoOrders.Application.Contracts.Clients.IClientService, ClientService>();
 builder.Services.AddScoped<NeoOrders.Application.Contracts.Sellers.ISellerService, SellerService>();
+builder.Services.AddScoped<NeoOrders.Application.Contracts.Config.IConfigService, ConfigService>();
 
 // Reportes: contratos en Application, implementaciones en Data (DIP).
 builder.Services.AddScoped<IReporteResumenRepository, ReporteResumenRepository>();

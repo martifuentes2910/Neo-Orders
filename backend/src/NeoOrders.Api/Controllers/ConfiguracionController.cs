@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
-
+using NeoOrders.Application.Contracts.Config;
 using NeoOrders.Application.DTOs.Config;
+using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Controllers;
 
@@ -14,43 +12,22 @@ namespace NeoOrders.Api.Controllers;
 [Authorize]
 public class ConfiguracionController : ControllerBase
 {
-    private readonly AppDbContext _db;
+    private readonly IConfigService _config;
     private readonly UserManager<ApplicationUser> _userManager;
-    public ConfiguracionController(AppDbContext db, UserManager<ApplicationUser> userManager)
+    public ConfiguracionController(IConfigService config, UserManager<ApplicationUser> userManager)
     {
-        _db = db;
+        _config = config;
         _userManager = userManager;
     }
 
-    // Company settings (admin)
     [HttpGet("company")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> GetEmpresa()
-    {
-        var s = await _db.CompanySettings.FirstOrDefaultAsync();
-        if (s == null)
-        {
-            s = new CompanySettings();
-            _db.CompanySettings.Add(s);
-            await _db.SaveChangesAsync();
-        }
-        return Ok(s);
-    }
+    public async Task<IActionResult> GetEmpresa() => Ok(await _config.GetCompanyAsync());
 
     [HttpPut("company")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> UpdateEmpresa([FromBody] CompanySettings dto)
-    {
-        var s = await _db.CompanySettings.FirstOrDefaultAsync();
-        if (s == null) { s = new CompanySettings(); _db.CompanySettings.Add(s); }
-        s.NombreEmpresa = dto.NombreEmpresa;
-        s.Moneda = dto.Moneda;
-        s.TipoDeCambio = dto.TipoDeCambio;
-        await _db.SaveChangesAsync();
-        return Ok(s);
-    }
+    public async Task<IActionResult> UpdateEmpresa([FromBody] CompanySettingsDto dto) => Ok(await _config.UpdateCompanyAsync(dto));
 
-    // Profile (current user)
     [HttpGet("profile")]
     public async Task<IActionResult> GetPerfil()
     {
@@ -72,13 +49,11 @@ public class ConfiguracionController : ControllerBase
         return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema });
     }
 
-    // Seed data (admin)
     [HttpPost("seed")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Seed()
     {
-        // Re-run seeder (idempotent for roles/users/settings; clients/orders only if empty)
-        await DbSeeder.SeedAsync(HttpContext.RequestServices);
+        await _config.SeedAsync(HttpContext.RequestServices);
         return Ok(new { message = "Datos de ejemplo verificados/cargados" });
     }
 }
