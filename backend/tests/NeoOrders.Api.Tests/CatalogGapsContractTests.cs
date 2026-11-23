@@ -74,6 +74,44 @@ public class CatalogGapsContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Empty(GetProperty(root, "errors").EnumerateArray());
     }
 
+    /// <summary>
+    /// Contrato real de preview con factor &lt;= 0: responde 200 con errors[]
+    /// (a diferencia de apply, que mapea la misma guardia a 400 {message}).
+    /// La vista previa no modifica precios.
+    /// </summary>
+    [Theory]
+    [InlineData(-100)]
+    [InlineData(-150)]
+    public async Task PostProductsPriceAdjustmentPreview_FactorNoPositivo_Retorna200ConErrors(int percent)
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var suffix = Guid.NewGuid().ToString("N");
+        var (activeId, inactiveId) = await SeedProductsAsync(auth, suffix, activeBasePrice: 10.00m, inactiveBasePrice: 50.00m);
+
+        var response = await auth.Client.PostAsJsonAsync("/api/products/price-adjustment/preview", new { percent });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        Assert.Equal((decimal)percent, GetProperty(root, "percent").GetDecimal());
+        Assert.True(GetProperty(root, "factor").GetDecimal() <= 0);
+        Assert.Equal(0, GetProperty(root, "affectedCount").GetInt32());
+        Assert.Empty(GetProperty(root, "items").EnumerateArray());
+
+        var errors = GetProperty(root, "errors");
+        var error = Assert.Single(errors.EnumerateArray());
+        Assert.Equal("El factor resultante debe ser mayor a 0.", error.GetString());
+
+        var prices = await auth.QueryDbAsync(async db =>
+        {
+            var active = await db.Products.SingleAsync(p => p.Id == activeId);
+            var inactive = await db.Products.SingleAsync(p => p.Id == inactiveId);
+            return (ActivePrice: active.BasePrice, InactivePrice: inactive.BasePrice);
+        });
+        Assert.Equal(10.00m, prices.ActivePrice);
+        Assert.Equal(50.00m, prices.InactivePrice);
+    }
+
     [Fact]
     public async Task PostProductsPriceAdjustmentApply_ConAdmin_Retorna200()
     {

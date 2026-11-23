@@ -53,6 +53,25 @@ public class ConfigAdminContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task PutConfigProfile_CuerpoJsonInvalido_Retorna400ConShape()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+
+        // [ApiController] rechaza el cuerpo no enlazable antes de ejecutar la
+        // acción: no hace falta que el usuario exista en Identity.
+        using var body = new StringContent("{", Encoding.UTF8, "application/json");
+        var response = await auth.Client.PutAsync("/api/config/profile", body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        Assert.Contains("json", mediaType, StringComparison.OrdinalIgnoreCase);
+        using var doc = await ReadJsonAsync(response);
+        Assert.True(
+            doc.RootElement.TryGetProperty("errors", out _) ||
+            doc.RootElement.TryGetProperty("message", out _));
+    }
+
+    [Fact]
     public async Task PutConfigCompany_PayloadVacio_Retorna200ConValoresPorDefecto()
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);

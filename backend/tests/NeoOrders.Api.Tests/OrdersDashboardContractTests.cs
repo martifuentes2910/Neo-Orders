@@ -69,6 +69,14 @@ public class OrdersDashboardContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task GetOrderStatuses_SinAuth_Retorna401()
+    {
+        using var client = CreateAnonymousClient();
+        var response = await client.GetAsync("/api/orders/statuses");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetDashboardMetrics_SinAuth_Retorna401()
     {
         using var client = CreateAnonymousClient();
