@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -124,6 +125,14 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
                         options.Roles = roles?.ToArray() ?? [];
                     });
                 services.AddAuthorization();
+
+                // El entorno Testing no es Development (SecurePolicy=Always) y el
+                // TestServer usa HTTP, así que el filtro global antiforgery lanzaría
+                // InvalidOperationException antes de llegar al controller. Los clientes
+                // con auth de prueba ya suplantan la autenticación por cookie: omitir
+                // antiforgery también en ellos mantiene los tests deterministas.
+                services.AddControllersWithViews(options =>
+                    options.Filters.Add(new IgnoreAntiforgeryTokenAttribute()));
             });
         });
 
