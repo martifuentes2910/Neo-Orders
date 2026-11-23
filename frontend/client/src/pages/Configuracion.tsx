@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import UserAvatar, { AVATAR_KEYS } from '@/components/UserAvatar';
 import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
-import { api } from '../api';
+import { useDatosConfig, useEmpresaForm, usePerfilForm } from '@/features/config';
+import { useUsers } from '@/features/users';
 import { motion } from 'framer-motion';
 import { Plus, Trash2, Save, User as UserIcon, Building2, Users, Database, Palette, Check, AlertTriangle, LifeBuoy, Mail, MessageCircle, Clock, Bug, Copy, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TableHead } from '@/components/ui/table';
 import SortableTableHead from '@/components/SortableTableHead';
-import { useTableSort } from '@/hooks/useTableSort';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -79,26 +79,7 @@ export default function Configuracion({ tab }: { tab?: string }) {
 }
 
 function PerfilTab({ user, refresh }: { user: User | null; refresh: () => Promise<void> }) {
-  const [form, setForm] = useState({ nombre: user?.nombre || '', apellido: user?.apellido || '', avatar: (user?.avatar || 'avatar-1') as string });
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const save = async () => {
-    setSaving(true);
-    setMsg(null);
-    try {
-      await api.config.perfil.update(form);
-      await refresh();
-      setMsg('Perfil actualizado');
-      toast.success('Perfil actualizado');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error inesperado';
-      setMsg(msg);
-      toast.error(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { form, setForm, saving, msg, save } = usePerfilForm(user, refresh);
 
   return (
     <div className="space-y-6">
@@ -266,29 +247,7 @@ function AparienciaTab({ mode, setMode }: { mode: 'claro' | 'oscuro' | 'auto'; s
 }
 
 function EmpresaTab({ company, update }: { company: CompanySettings | null; update: (data: Partial<CompanySettings>) => Promise<void> }) {
-  const [form, setForm] = useState({ nombreEmpresa: company?.nombreEmpresa || '' });
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    setForm({ nombreEmpresa: company?.nombreEmpresa || '' });
-  }, [company]);
-
-  const save = async () => {
-    setSaving(true);
-    setMsg(null);
-    try {
-      await update(form);
-      setMsg('Empresa actualizada');
-      toast.success('Empresa actualizada');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error inesperado';
-      setMsg(msg);
-      toast.error(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { form, setForm, saving, msg, save } = useEmpresaForm(company, update);
 
   return (
     <div className="space-y-6">
@@ -307,45 +266,9 @@ function EmpresaTab({ company, update }: { company: CompanySettings | null; upda
 }
 
 function UsuariosTab() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', nombre: '', apellido: '', avatar: 'avatar-1', rol: 'Empleado' });
-  const [saving, setSaving] = useState(false);
-
-  const { sorted, sort, toggle } = useTableSort(users, {
-    email: (u) => u.email,
-    nombre: (u) => `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim(),
-    rol: (u) => (u.roles ?? []).join(', '),
-  });
-
-  const load = async () => {
-    setLoading(true);
-    try { setUsers(await api.users.list()); } catch { toast.error('Error al cargar usuarios'); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await api.users.create(form);
-      toast.success('Usuario creado');
-      setShowForm(false);
-      setForm({ email: '', password: '', nombre: '', apellido: '', avatar: 'avatar-1', rol: 'Empleado' });
-      await load();
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Error inesperado');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm('¿Eliminar este usuario?')) return;
-    try { await api.users.remove(id); toast.success('Usuario eliminado'); await load(); } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Error inesperado'); }
-  };
+  const {
+    users, loading, showForm, setShowForm, form, setForm, saving, sort, toggle, save, remove,
+  } = useUsers();
 
   return (
     <div className="space-y-6">
@@ -369,7 +292,7 @@ function UsuariosTab() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((u) => (
+              {users.map((u) => (
                 <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3">{u.email}</td>
                   <td className="px-4 py-3">
@@ -551,49 +474,10 @@ function SoporteTab() {
 }
 
 function DatosTab() {
-  const [msg, setMsg] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [clearing, setClearing] = useState(false);
-  const [showClear, setShowClear] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
-  const busy = loading || clearing;
-
-  const runSeed = async () => {
-    setLoading(true);
-    setMsg(null);
-    try {
-      const r = await api.config.seed();
-      setMsg(r.message || 'Datos verificados');
-      toast.success(r.message || 'Datos verificados');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error inesperado';
-      setMsg(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const runClear = async () => {
-    setClearing(true);
-    setMsg(null);
-    try {
-      const r = await api.config.clear();
-      const e = r.eliminados ?? {};
-      const resumen = `Eliminados: ${e.notificaciones ?? 0} notificaciones, ${e.pedidos ?? 0} pedidos, ${e.productos ?? 0} productos, ${e.vendedores ?? 0} vendedores y ${e.clientes ?? 0} clientes.`;
-      setMsg(resumen);
-      toast.success(r.message || 'Datos operativos eliminados');
-      setShowClear(false);
-      setConfirmText('');
-      window.setTimeout(() => window.location.reload(), 1200);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error inesperado';
-      setMsg(msg);
-      toast.error(msg);
-    } finally {
-      setClearing(false);
-    }
-  };
+  const {
+    msg, setMsg, loading, clearing, busy, showClear, setShowClear, confirmText, setConfirmText,
+    runSeed, runClear,
+  } = useDatosConfig();
 
   return (
     <div className="space-y-4">

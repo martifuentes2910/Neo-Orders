@@ -1,18 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useChartTheme } from '../hooks/useChartTheme';
-import { api } from '../api';
-import { ORDER_STATUSES, getStatusColor, type OrderStatus } from '../types';
-import type {
-  FilaCliente,
-  FilaProducto,
-  FilaVendedor,
-  FiltrosReporteParams,
-  ReporteDetalle,
-  ReporteResumenResponse,
-  VistaReporte,
-} from '../types/reportes';
+import { ORDER_STATUSES } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -23,32 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import SortableTableHead from '@/components/SortableTableHead';
-import { useTableSort } from '@/hooks/useTableSort';
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import ChartGradients from '@/components/ChartGradients';
 import { GRAD } from '@/lib/chartGradients';
 import ChartTooltip from '@/components/ChartTooltip';
 import { compactNumber } from '@/lib/format';
-
-function today() { return new Date().toISOString().slice(0, 10); }
-function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
-function yearStart() { return `${new Date().getFullYear()}-01-01`; }
-
-function periodoDe(desde: string, hasta: string): string {
-  if (!desde && !hasta) return 'all';
-  if (desde === daysAgo(30) && hasta === today()) return '30';
-  if (desde === daysAgo(90) && hasta === today()) return '90';
-  if (desde === yearStart() && hasta === today()) return 'year';
-  return 'custom';
-}
-
-const VISTAS: { value: VistaReporte; label: string }[] = [
-  { value: 'resumen', label: 'Resumen' },
-  { value: 'vendedores', label: 'Ventas por vendedor' },
-  { value: 'productos', label: 'Productos más vendidos' },
-  { value: 'clientes', label: 'Clientes con más compras' },
-];
+import { VISTAS, useReports, type VistaReporte } from '@/features/reports';
 
 const GRAD_POR_VISTA: Record<Exclude<VistaReporte, 'resumen'>, string> = {
   vendedores: GRAD.coralH,
@@ -56,248 +25,19 @@ const GRAD_POR_VISTA: Record<Exclude<VistaReporte, 'resumen'>, string> = {
   clientes: GRAD.amberH,
 };
 
-interface FilaNormalizada {
-  id: string;
-  nombre: string;
-  pedidos: number;
-  unidades: number;
-  ingresos: number;
-  participacion: number;
-  comision?: number;
-  comisionEstimada?: number;
-}
-
-/** Filtros editados en la UI; se envían juntos al pulsar "Filtrar". */
-interface BorradorFiltros {
-  desde: string;
-  hasta: string;
-  clientId: string;
-  sellerId: string;
-  estado: string;
-}
-
-function nombreDeFila(f: FilaVendedor | FilaProducto | FilaCliente, tipo: ReporteDetalle['tipo']): string {
-  if (tipo === 'vendedor') return (f as FilaVendedor).vendedor;
-  if (tipo === 'producto') return (f as FilaProducto).producto;
-  return (f as FilaCliente).cliente;
-}
-
-function normalizar(fila: FilaVendedor | FilaProducto | FilaCliente, tipo: ReporteDetalle['tipo']): FilaNormalizada {
-  if (tipo === 'vendedor') {
-    const f = fila as FilaVendedor;
-    return {
-      id: String(f.vendedorId), nombre: f.vendedor, pedidos: f.pedidos, unidades: f.unidades,
-      ingresos: f.ingresos, participacion: f.participacion,
-      comision: f.comision, comisionEstimada: f.comisionEstimada,
-    };
-  }
-  if (tipo === 'producto') {
-    const f = fila as FilaProducto;
-    return {
-      id: f.producto, nombre: f.producto, pedidos: f.pedidos, unidades: f.unidades,
-      ingresos: f.ingresos, participacion: f.participacion,
-    };
-  }
-  const f = fila as FilaCliente;
-  return {
-    id: String(f.clienteId), nombre: f.cliente, pedidos: f.pedidos, unidades: f.unidades,
-    ingresos: f.ingresos, participacion: f.participacion,
-  };
-}
-
+/** Página de Reportes: composición visual; filtros, fetch y derivaciones viven en `useReports`. */
 export default function Reportes({ vista = 'resumen' }: { vista?: VistaReporte }) {
   const { formatMoney } = useSettings();
   const chartTheme = useChartTheme();
   const { resolved, palette } = useTheme();
   const isDark = resolved === 'oscuro';
   const reduceMotion = useReducedMotion();
-  const navigate = useNavigate();
-  const [params, setParams] = useSearchParams();
-
-  const desdeParam = params.get('desde');
-  const hastaParam = params.get('hasta');
-  // `?desde=&hasta=` significa "sin límite de fechas" (preset "Todo el historial").
-  const desde = desdeParam === null ? daysAgo(30) : desdeParam;
-  const hasta = hastaParam === null ? today() : hastaParam;
-  const clientId = params.get('clientId') || '';
-  const sellerId = params.get('sellerId') || '';
-  const estado = params.get('estado') || 'Todos';
-  const pageParam = Number(params.get('page') ?? '1');
-  const page = Number.isInteger(pageParam) && pageParam >= 1 ? pageParam : 1;
-  const sizeParam = Number(params.get('pageSize') ?? '25');
-  const pageSize = Number.isInteger(sizeParam) && sizeParam >= 1 && sizeParam <= 100 ? sizeParam : 25;
-
-  const firmaFiltros = [desde, hasta, clientId, sellerId, estado].join('\u0000');
-  const [edicion, setEdicion] = useState<{ firma: string; valores: BorradorFiltros } | null>(null);
-  // La URL es el estado aplicado; la edición sólo vale para esa firma, así back/forward la descarta sola.
-  const borrador: BorradorFiltros = edicion?.firma === firmaFiltros
-    ? edicion.valores
-    : { desde, hasta, clientId, sellerId, estado };
-  const [resumen, setResumen] = useState<ReporteResumenResponse | null>(null);
-  const [detalle, setDetalle] = useState<ReporteDetalle | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [clients, setClients] = useState<any[]>([]);
-  const [sellers, setSellers] = useState<any[]>([]);
-
-  const filtros: FiltrosReporteParams = useMemo(() => ({
-    desde: desde || undefined,
-    hasta: hasta || undefined,
-    clientId: clientId ? Number(clientId) : undefined,
-    sellerId: sellerId ? Number(sellerId) : undefined,
-    estado,
-  }), [desde, hasta, clientId, sellerId, estado]);
-
-  const period = periodoDe(borrador.desde, borrador.hasta);
-
-  const iniciarCarga = () => {
-    setLoading(true);
-    setError(null);
-    setDetalle(null);
-  };
-
-  const setBorradorFiltro = (key: keyof BorradorFiltros, value: string) => {
-    setEdicion({ firma: firmaFiltros, valores: { ...borrador, [key]: value } });
-  };
-
-  const cambiarPeriodo = (p: string) => {
-    if (p === '30') setEdicion({ firma: firmaFiltros, valores: { ...borrador, desde: daysAgo(30), hasta: today() } });
-    else if (p === '90') setEdicion({ firma: firmaFiltros, valores: { ...borrador, desde: daysAgo(90), hasta: today() } });
-    else if (p === 'year') setEdicion({ firma: firmaFiltros, valores: { ...borrador, desde: yearStart(), hasta: today() } });
-    else if (p === 'all') setEdicion({ firma: firmaFiltros, valores: { ...borrador, desde: '', hasta: '' } });
-    // "Personalizado": conserva las fechas para editarlas en los campos.
-  };
-
-  const queryDe = (origen: BorradorFiltros) => {
-    const next = new URLSearchParams();
-    const esPorDefecto = origen.desde === daysAgo(30) && origen.hasta === today();
-    if (!esPorDefecto) {
-      next.set('desde', origen.desde);
-      next.set('hasta', origen.hasta);
-    }
-    if (origen.clientId) next.set('clientId', origen.clientId);
-    if (origen.sellerId) next.set('sellerId', origen.sellerId);
-    if (origen.estado && origen.estado !== 'Todos') next.set('estado', origen.estado);
-    const size = params.get('pageSize');
-    if (size && size !== '25') next.set('pageSize', size);
-    return next;
-  };
-
-  const aplicar = (origen: BorradorFiltros = borrador) => {
-    const sinCambios =
-      origen.desde === desde && origen.hasta === hasta &&
-      origen.clientId === clientId && origen.sellerId === sellerId &&
-      origen.estado === estado;
-    if (sinCambios) return;
-    iniciarCarga();
-    setEdicion(null);
-    setParams(queryDe(origen));
-  };
-
-  const setPaginacion = (nextPage: number, nextSize?: number) => {
-    iniciarCarga();
-    const next = new URLSearchParams(params);
-    if (nextPage === 1) next.delete('page');
-    else next.set('page', String(nextPage));
-    if (nextSize !== undefined) {
-      if (nextSize === 25) next.delete('pageSize');
-      else next.set('pageSize', String(nextSize));
-      next.delete('page');
-    }
-    setParams(next);
-  };
-
-  const cambiarVista = (destino: VistaReporte) => {
-    iniciarCarga();
-    setEdicion(null);
-    const qs = queryDe(borrador).toString();
-    const base = destino === 'resumen' ? '/reportes' : `/reportes/${destino}`;
-    navigate(`${base}${qs ? `?${qs}` : ''}`);
-  };
-
-  const clear = () => {
-    const yaPorDefecto =
-      desde === daysAgo(30) && hasta === today() && !clientId && !sellerId &&
-      estado === 'Todos' && page === 1 && pageSize === 25;
-    setEdicion(null);
-    if (yaPorDefecto) return;
-    iniciarCarga();
-    if (vista === 'resumen') setResumen(null);
-    const next = queryDe({ desde: daysAgo(30), hasta: today(), clientId: '', sellerId: '', estado: 'Todos' });
-    next.delete('pageSize');
-    setParams(next);
-  };
-
-  useEffect(() => {
-    api.clients.list().then(setClients).catch(() => {});
-    api.sellers.list(true).then(setSellers).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (vista !== 'resumen') return;
-    let activo = true;
-    api.reports(filtros)
-      .then((data) => { if (activo) { setResumen(data); setError(null); } })
-      .catch((e: Error) => { if (activo) setError(e.message || 'No se pudieron cargar los reportes.'); })
-      .finally(() => { if (activo) setLoading(false); });
-    return () => { activo = false; };
-  }, [vista, filtros]);
-
-  useEffect(() => {
-    if (vista === 'resumen') return;
-    let activo = true;
-    const peticion = vista === 'vendedores'
-      ? api.reportesDetalle.vendedores({ ...filtros, page, pageSize })
-      : vista === 'productos'
-        ? api.reportesDetalle.productos({ ...filtros, page, pageSize })
-        : api.reportesDetalle.clientes({ ...filtros, page, pageSize });
-    peticion
-      .then((data) => { if (activo) { setDetalle(data); setError(null); } })
-      .catch((e: Error) => { if (activo) setError(e.message || 'No se pudo cargar el reporte.'); })
-      .finally(() => { if (activo) setLoading(false); });
-    return () => { activo = false; };
-  }, [vista, filtros, page, pageSize]);
-
-  const ordenEstados: OrderStatus[] = ['Cancelado', 'Pendiente', 'Procesado', 'Enviado', 'Entregado'];
-  const pieData = (resumen?.porEstado || [])
-    .map((e) => ({
-      name: e.estado,
-      value: e.cantidad,
-      color: getStatusColor(e.estado as OrderStatus, isDark, palette) || '#6b7280',
-    }))
-    .sort((a, b) => {
-      const ai = ordenEstados.indexOf(a.name as OrderStatus);
-      const bi = ordenEstados.indexOf(b.name as OrderStatus);
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-    });
-  const barMes = (resumen?.porMes || []).map((m) => ({ name: `${m.month}/${String(m.year).slice(2)}`, ingresos: m.ingresos }));
-  const topProd = (resumen?.topProductos || []).map((p) => ({ name: p.producto, ingresos: p.ingresos }));
-  const topCli = (resumen?.topClientes || []).map((c) => ({ name: c.cliente, total: c.total }));
-  const ventasVend = (resumen?.ventasPorVendedor || []).map((v) => ({ name: v.vendedor, total: v.total }));
-  const totalPedidos = pieData.reduce((acc, d) => acc + Number(d.value || 0), 0);
-
-  const filas = useMemo<FilaNormalizada[]>(
-    () => (detalle ? detalle.filas.map((f) => normalizar(f, detalle.tipo)) : []),
-    [detalle],
-  );
-  const accessors = useMemo(() => ({
-    nombre: (r: FilaNormalizada) => r.nombre,
-    pedidos: (r: FilaNormalizada) => r.pedidos,
-    unidades: (r: FilaNormalizada) => r.unidades,
-    ingresos: (r: FilaNormalizada) => r.ingresos,
-    participacion: (r: FilaNormalizada) => r.participacion,
-    comision: (r: FilaNormalizada) => r.comision,
-    comisionEstimada: (r: FilaNormalizada) => r.comisionEstimada,
-  }), []);
-  const { sorted, sort, toggle } = useTableSort(filas, accessors);
-
-  const graficoData = useMemo(
-    () => (detalle?.filasGrafico || []).map((f) => ({
-      name: nombreDeFila(f, detalle!.tipo),
-      ingresos: f.ingresos,
-    })),
-    [detalle],
-  );
+  const {
+    estado, page, pageSize, borrador, period, setBorradorFiltro, cambiarPeriodo,
+    aplicar, clear, setPaginacion, cambiarVista, clients, sellers, resumen, detalle,
+    loading, error, pieData, barMes, topProd, topCli, ventasVend, totalPedidos,
+    sorted, sort, toggle, graficoData,
+  } = useReports({ vista, isDark, palette });
 
   return (
     <div className="space-y-6">

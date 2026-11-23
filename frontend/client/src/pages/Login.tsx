@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useLogin } from '@/features/auth';
 import Logo from '@/components/Logo';
 import LoginIllustration from '@/components/auth/LoginIllustration';
 import { Button } from '@/components/ui/button';
@@ -11,33 +10,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 
+/** Página de Login: el formulario y el envío viven en `useLogin`. */
 export default function Login() {
-  const { login, user, loading } = useAuth();
   const { palette } = useTheme();
-  const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
-  const [email, setEmail] = useState('admin@neoorders.com');
-  const [password, setPassword] = useState('Admin123!');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const {
+    user, loading, email, setEmail, password, setPassword,
+    showPassword, setShowPassword, error, submitting, submit,
+  } = useLogin();
 
   if (!loading && user) return <Navigate to="/panel" replace />;
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await login(email, password);
-      navigate('/panel');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión';
-      setError(msg === 'UNAUTHORIZED' ? 'Credenciales inválidas. Verificá tu email y contraseña.' : msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const isClean = palette === 'clean';
   const panelStyle = isClean

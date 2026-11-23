@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '../api';
+import { notificationsFeatureApi } from '../features/notifications/api';
 import { useAuth } from './AuthContext';
 import type { AppNotification, NotificationsSummary } from '../types';
 
@@ -43,7 +43,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await api.notifications.list();
+      const data = await notificationsFeatureApi.list();
       setItems(Array.isArray(data?.items) ? data.items : []);
       setSummary({ ...EMPTY_SUMMARY, ...(data?.resumen || {}) });
     } catch {

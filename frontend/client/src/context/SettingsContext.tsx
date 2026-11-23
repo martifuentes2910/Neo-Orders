@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '../api';
+import { configFeatureApi } from '../features/config/api';
 import { useAuth } from './AuthContext';
 import type { CompanySettings } from '../types';
 
@@ -33,7 +33,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const refresh = async () => {
     try {
-      setCompany(toCompany(await api.config.empresa.get()));
+      setCompany(toCompany(await configFeatureApi.empresa.get()));
     } catch {
       setCompany({ nombreEmpresa: 'NeoOrders' });
     }
@@ -46,7 +46,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const update = async (data: Partial<CompanySettings>) => {
-    const res = await api.config.empresa.update({ ...company, ...data });
+    const res = await configFeatureApi.empresa.update({ ...company, ...data });
     setCompany(toCompany(res));
   };
 

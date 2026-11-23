@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '../api';
+import { authFeatureApi } from '../features/auth/api';
 import type { User } from '../types';
 
 interface AuthContextType {
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = async () => {
     try {
-      setUser(toUser(await api.me()));
+      setUser(toUser(await authFeatureApi.me()));
     } catch {
       setUser(null);
     }
@@ -43,11 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    setUser(toUser(await api.login(email, password)));
+    setUser(toUser(await authFeatureApi.login(email, password)));
   };
 
   const logout = async () => {
-    try { await api.logout(); } catch { /* ignore */ }
+    try { await authFeatureApi.logout(); } catch { /* ignore */ }
     setUser(null);
   };
 
