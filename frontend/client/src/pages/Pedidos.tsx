@@ -7,7 +7,11 @@ import {
   esEstadoBloqueado,
   getStatusColor,
   getStatusTextColor,
+  type Client,
+  type Order,
   type OrderStatus,
+  type Product,
+  type Seller,
 } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -27,7 +31,7 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { toast } from 'sonner';
 import CsvImportDialog from '@/components/CsvImportDialog';
 
-let cachedOrders: any[] | null = null;
+let cachedOrders: Order[] | null = null;
 
 const esTerminal = (estado: OrderStatus) => estadosDestino(estado).length === 1;
 
@@ -48,10 +52,10 @@ export default function Pedidos() {
   const isDark = resolved === 'oscuro';
   const { user } = useAuth();
   const isAdmin = user?.roles?.includes('Admin');
-  const [orders, setOrders] = useState<any[]>(cachedOrders || []);
-  const [clients, setClients] = useState<any[]>([]);
-  const [sellers, setSellers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>(cachedOrders || []);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(!cachedOrders);
   const [search, setSearch] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('Todos');
@@ -61,8 +65,8 @@ export default function Pedidos() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState<any>(emptyForm);
+  const [editing, setEditing] = useState<Order | null>(null);
+  const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -160,14 +164,14 @@ export default function Pedidos() {
     const numId = id ? Number(id) : 0;
     const p = products.find((x) => x.id === numId);
     if (p) {
-      setForm((f: any) => ({
+      setForm((f) => ({
         ...f,
         productId: p.id,
         productName: p.name,
         precioUnitario: p.basePrice,
       }));
     } else {
-      setForm((f: any) => ({ ...f, productId: null }));
+      setForm((f) => ({ ...f, productId: null }));
     }
   };
 
@@ -178,12 +182,12 @@ export default function Pedidos() {
     setShowForm(true);
   };
 
-  const openEdit = (o: any) => {
+  const openEdit = (o: Order) => {
     setEditing(o);
     setForm({
       clientId: o.clientId,
-      sellerId: o.sellerId,
-      productId: o.productId,
+      sellerId: o.sellerId ?? null,
+      productId: o.productId ?? null,
       productName: o.productName,
       cantidad: o.cantidad,
       precioUnitario: o.precioUnitario,
@@ -209,7 +213,7 @@ export default function Pedidos() {
     setSaving(true);
     try {
       if (soloEstado) {
-        await api.orders.updateStatus(editing.id, form.estado);
+        await api.orders.updateStatus(editing!.id, form.estado);
         toast.success('Estado actualizado');
       } else {
         const payload = {
@@ -230,8 +234,8 @@ export default function Pedidos() {
       }
       setShowForm(false);
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setSaving(false);
     }
@@ -244,8 +248,8 @@ export default function Pedidos() {
       await api.orders.remove(id);
       toast.success('Pedido eliminado');
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setDeleting(null);
     }
@@ -425,7 +429,7 @@ export default function Pedidos() {
               </p>
               <div className="grid gap-2">
                 <Label>Estado</Label>
-                <Select value={form.estado} onValueChange={(v) => setForm({ ...form, estado: v })}>
+                <Select value={form.estado} onValueChange={(v) => setForm({ ...form, estado: v as OrderStatus })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -514,7 +518,7 @@ export default function Pedidos() {
               {editing && (
                 <div className="grid gap-2">
                   <Label>Estado</Label>
-                  <Select value={form.estado} onValueChange={(v) => setForm({ ...form, estado: v })}>
+                  <Select value={form.estado} onValueChange={(v) => setForm({ ...form, estado: v as OrderStatus })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>

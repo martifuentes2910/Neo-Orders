@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
 import { api } from '../api';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Save, User, Building2, Users, Database, Palette, Check, AlertTriangle, LifeBuoy, Mail, MessageCircle, Clock, Bug, Copy, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Save, User as UserIcon, Building2, Users, Database, Palette, Check, AlertTriangle, LifeBuoy, Mail, MessageCircle, Clock, Bug, Copy, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { PALETTES, type PaletteId } from '../types';
+import { PALETTES, type CompanySettings, type PaletteId, type User } from '../types';
 import { cn } from '@/lib/utils';
 
 export default function Configuracion({ tab }: { tab?: string }) {
@@ -43,7 +43,7 @@ export default function Configuracion({ tab }: { tab?: string }) {
 
       <Tabs value={active} onValueChange={setActive} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="perfil" className="gap-2"><User className="h-4 w-4" /> Perfil</TabsTrigger>
+          <TabsTrigger value="perfil" className="gap-2"><UserIcon className="h-4 w-4" /> Perfil</TabsTrigger>
           <TabsTrigger value="apariencia" className="gap-2"><Palette className="h-4 w-4" /> Apariencia</TabsTrigger>
           {isAdmin && <TabsTrigger value="empresa" className="gap-2"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>}
           {isAdmin && <TabsTrigger value="usuarios" className="gap-2"><Users className="h-4 w-4" /> Usuarios</TabsTrigger>}
@@ -78,8 +78,8 @@ export default function Configuracion({ tab }: { tab?: string }) {
   );
 }
 
-function PerfilTab({ user, refresh }: any) {
-  const [form, setForm] = useState({ nombre: user?.nombre || '', apellido: user?.apellido || '', avatar: user?.avatar || 'avatar-1' });
+function PerfilTab({ user, refresh }: { user: User | null; refresh: () => Promise<void> }) {
+  const [form, setForm] = useState({ nombre: user?.nombre || '', apellido: user?.apellido || '', avatar: (user?.avatar || 'avatar-1') as string });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -91,9 +91,10 @@ function PerfilTab({ user, refresh }: any) {
       await refresh();
       setMsg('Perfil actualizado');
       toast.success('Perfil actualizado');
-    } catch (e: any) {
-      setMsg(e.message);
-      toast.error(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error inesperado';
+      setMsg(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -264,7 +265,7 @@ function AparienciaTab({ mode, setMode }: { mode: 'claro' | 'oscuro' | 'auto'; s
   );
 }
 
-function EmpresaTab({ company, update }: any) {
+function EmpresaTab({ company, update }: { company: CompanySettings | null; update: (data: Partial<CompanySettings>) => Promise<void> }) {
   const [form, setForm] = useState({ nombreEmpresa: company?.nombreEmpresa || '' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -280,9 +281,10 @@ function EmpresaTab({ company, update }: any) {
       await update(form);
       setMsg('Empresa actualizada');
       toast.success('Empresa actualizada');
-    } catch (e: any) {
-      setMsg(e.message);
-      toast.error(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error inesperado';
+      setMsg(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -305,7 +307,7 @@ function EmpresaTab({ company, update }: any) {
 }
 
 function UsuariosTab() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', nombre: '', apellido: '', avatar: 'avatar-1', rol: 'Empleado' });
@@ -333,8 +335,8 @@ function UsuariosTab() {
       setShowForm(false);
       setForm({ email: '', password: '', nombre: '', apellido: '', avatar: 'avatar-1', rol: 'Empleado' });
       await load();
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Error inesperado');
     } finally {
       setSaving(false);
     }
@@ -342,7 +344,7 @@ function UsuariosTab() {
 
   const remove = async (id: string) => {
     if (!confirm('¿Eliminar este usuario?')) return;
-    try { await api.users.remove(id); toast.success('Usuario eliminado'); await load(); } catch (e: any) { toast.error(e.message); }
+    try { await api.users.remove(id); toast.success('Usuario eliminado'); await load(); } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Error inesperado'); }
   };
 
   return (
@@ -564,8 +566,9 @@ function DatosTab() {
       setMsg(r.message || 'Datos verificados');
       toast.success(r.message || 'Datos verificados');
     } catch (e: any) {
-      setMsg(e.message);
-      toast.error(e.message);
+      const msg = e instanceof Error ? e.message : 'Error inesperado';
+      setMsg(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -583,9 +586,10 @@ function DatosTab() {
       setShowClear(false);
       setConfirmText('');
       window.setTimeout(() => window.location.reload(), 1200);
-    } catch (err: any) {
-      setMsg(err.message);
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error inesperado';
+      setMsg(msg);
+      toast.error(msg);
     } finally {
       setClearing(false);
     }
