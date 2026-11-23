@@ -68,7 +68,7 @@ export const api = {
         precioUnitario?: number;
       },
     ) => ordersApi.update(id, data),
-    // KAN-16: ?nico camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
+    // KAN-16: único camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
     updateStatus: (id: number, estado: string) => ordersApi.updateStatus(id, estado),
     remove: (id: number) => ordersApi.remove(id),
     templateUrl: () => `${BASE}/orders/import-csv/template`,

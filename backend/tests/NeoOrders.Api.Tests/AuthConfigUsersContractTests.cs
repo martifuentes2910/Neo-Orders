@@ -158,6 +158,49 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Contains("Empleado", roles.EnumerateArray().Select(r => r.GetString()).ToList());
     }
 
+    /// <summary>
+    /// El login es la primera respuesta que consume AuthContext; debe traer la
+    /// paleta guardada para que el tema no parpadee con el valor por defecto.
+    /// </summary>
+    [Fact]
+    public async Task PostAuthLogin_ConPaletaPersonalizada_RetornaPaletaPersistida()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var email = $"login.palette.{suffix}@test.local";
+        const string password = "Clave123!";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            if (!await roleManager.RoleExistsAsync("Empleado"))
+                Assert.True((await roleManager.CreateAsync(new IdentityRole("Empleado"))).Succeeded);
+
+            var created = await userManager.CreateAsync(new ApplicationUser
+            {
+                Id = $"login-palette-{suffix}",
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                Nombre = "Login",
+                Apellido = "Paleta",
+                Paleta = "menta"
+            }, password);
+            Assert.True(created.Succeeded, string.Join(" ", created.Errors.Select(e => e.Description)));
+
+            var user = await userManager.FindByEmailAsync(email);
+            Assert.NotNull(user);
+            Assert.True((await userManager.AddToRoleAsync(user, "Empleado")).Succeeded);
+        }
+
+        using var client = CreateAnonymousClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("menta", GetProperty(doc.RootElement, "paleta").GetString());
+    }
+
     [Fact]
     public async Task GetAuthMe_ConUsuarioSembrado_Retorna200ConShapeYRoles()
     {
@@ -192,6 +235,34 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
         var roles = GetProperty(root, "roles");
         Assert.Equal(JsonValueKind.Array, roles.ValueKind);
         Assert.Contains("Empleado", roles.EnumerateArray().Select(role => role.GetString()).ToList());
+    }
+
+    /// <summary>
+    /// UserDto expone `Paleta` y AuthContext la consume; el mapping de /auth/me debe
+    /// devolver la paleta persistida y no el valor por defecto del DTO.
+    /// </summary>
+    [Fact]
+    public async Task GetAuthMe_ConPaletaPersonalizada_RetornaPaletaPersistida()
+    {
+        const string userId = "auth-me-palette-user";
+        using var auth = _factory.CreateClientWithTestAuth(userId: userId);
+
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = userId,
+            UserName = "auth.me.palette@test.local",
+            Email = "auth.me.palette@test.local",
+            EmailConfirmed = true,
+            Nombre = "Paleta",
+            Apellido = "Test",
+            Paleta = "verde"
+        }, "Empleado");
+
+        var response = await auth.Client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("verde", GetProperty(doc.RootElement, "paleta").GetString());
     }
 
     [Fact]

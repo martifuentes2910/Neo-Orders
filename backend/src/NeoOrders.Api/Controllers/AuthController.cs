@@ -60,6 +60,7 @@ public class AuthController : ControllerBase
             Apellido = user.Apellido,
             Avatar = user.Avatar,
             Tema = user.Tema,
+            Paleta = user.Paleta,
             Roles = roles.ToList()
         };
     }

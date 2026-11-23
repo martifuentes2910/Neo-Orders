@@ -43,7 +43,7 @@ async function handle<T>(res: Response): Promise<T> {
       const b = body as Record<string, unknown> | null;
       const errors = b?.errors;
       if (typeof b?.message === 'string') message = b.message;
-      else if (Array.isArray(errors) && (errors[0] as Record<string, unknown> | undefined)?.row) message = 'El archivo contiene errores de validaci?n.';
+      else if (Array.isArray(errors) && (errors[0] as Record<string, unknown> | undefined)?.row) message = 'El archivo contiene errores de validación.';
       else if (errors && typeof errors === 'object' && !Array.isArray(errors)) message = Object.values(errors as Record<string, unknown[]>).flat().join(' ');
       else if (typeof b?.title === 'string') message = b.title;
     } catch {

@@ -40,7 +40,7 @@ export const ordersApi = {
       precioUnitario?: number;
     },
   ) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  // KAN-16: ?nico camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
+  // KAN-16: único camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
   updateStatus: (id: number, estado: string) =>
     request<void>(`/orders/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
   remove: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
