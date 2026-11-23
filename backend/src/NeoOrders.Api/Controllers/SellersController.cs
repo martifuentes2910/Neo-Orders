@@ -1,8 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
+using NeoOrders.Application.Contracts.Sellers;
+using NeoOrders.Application.DTOs.Sellers;
 
 namespace NeoOrders.Api.Controllers;
 
@@ -11,48 +10,37 @@ namespace NeoOrders.Api.Controllers;
 [Authorize]
 public class SellersController : ControllerBase
 {
-    private readonly AppDbContext _db;
-    public SellersController(AppDbContext db) => _db = db;
+    private readonly ISellerService _sellers;
+    public SellersController(ISellerService sellers) => _sellers = sellers;
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] bool? onlyActive)
-    {
-        var q = _db.Sellers.AsQueryable();
-        if (onlyActive == true) q = q.Where(s => s.Active);
-        return Ok(await q.OrderBy(s => s.Name).ToListAsync());
-    }
+    public async Task<IActionResult> List([FromQuery] bool? onlyActive) => Ok(await _sellers.ListAsync(onlyActive));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
     {
-        var s = await _db.Sellers.FindAsync(id);
+        var s = await _sellers.GetByIdAsync(id);
         if (s == null) return NotFound();
         return Ok(s);
     }
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Create([FromBody] Seller dto)
+    public async Task<IActionResult> Create([FromBody] SellerDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        _db.Sellers.Add(dto);
-        await _db.SaveChangesAsync();
-        return CreatedAtAction(nameof(Get), new { id = dto.Id }, dto);
+        var created = await _sellers.CreateAsync(dto);
+        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update(int id, [FromBody] Seller dto)
+    public async Task<IActionResult> Update(int id, [FromBody] SellerDto dto)
     {
         if (id != dto.Id) return BadRequest();
-        var existing = await _db.Sellers.FindAsync(id);
-        if (existing == null) return NotFound();
-        existing.Name = dto.Name;
-        existing.Email = dto.Email;
-        existing.Phone = dto.Phone;
-        existing.CommissionPercentage = dto.CommissionPercentage;
-        existing.Active = dto.Active;
-        await _db.SaveChangesAsync();
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var ok = await _sellers.UpdateAsync(id, dto);
+        if (!ok) return NotFound();
         return NoContent();
     }
 
@@ -60,11 +48,9 @@ public class SellersController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
-        var s = await _db.Sellers.Include(x => x.Orders).FirstOrDefaultAsync(x => x.Id == id);
-        if (s == null) return NotFound();
-        if (s.Orders.Any()) return BadRequest(new { message = "El vendedor tiene pedidos asociados" });
-        _db.Sellers.Remove(s);
-        await _db.SaveChangesAsync();
+        var (ok, error) = await _sellers.DeleteAsync(id);
+        if (!ok && error == "NOT_FOUND") return NotFound();
+        if (!ok) return BadRequest(new { message = error });
         return NoContent();
     }
 }
