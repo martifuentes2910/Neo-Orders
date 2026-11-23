@@ -6,44 +6,19 @@ import type {
   ReporteResumenResponse,
   VentasVendedorResponse,
 } from './types/reportes';
+import type {
+  Client,
+  CsvImportResult,
+  NotificationsSummary,
+  Order,
+  PriceAdjustmentApplyResponse,
+  PriceAdjustmentPreviewResponse,
+  Product,
+  Seller,
+  User,
+} from './types';
 
-export interface PriceAdjustmentItem {
-  id: number;
-  sku: string;
-  name: string;
-  currentBasePrice: number;
-  newBasePrice: number;
-}
-
-export interface PriceAdjustmentPreviewResponse {
-  percent: number;
-  factor: number;
-  affectedCount: number;
-  skippedInactiveCount: number;
-  items: PriceAdjustmentItem[];
-  errors: string[];
-}
-
-export interface PriceAdjustmentApplyResponse {
-  affectedCount: number;
-  percent: number;
-  factor: number;
-  appliedAtUtc: string;
-}
-
-export interface CsvImportError {
-  row: number;
-  field: string;
-  value: string;
-  message: string;
-}
-
-export interface CsvImportResult {
-  totalRows: number;
-  validRows: number;
-  imported: number;
-  errors: CsvImportError[];
-}
+export type { CsvImportError, CsvImportResult, PriceAdjustmentItem, PriceAdjustmentPreviewResponse, PriceAdjustmentApplyResponse } from './types';
 
 const BASE =
   (import.meta as any).env?.VITE_API_URL ||
@@ -140,14 +115,14 @@ function buildReporteQuery(filtros?: FiltrosReporteParams): string {
 
 export const api = {
   login: (email: string, password: string) =>
-    request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    request<User>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
-  me: () => request<any>('/auth/me'),
+  me: () => request<User>('/auth/me'),
 
   clients: {
-    list: (search?: string) => request<any[]>(`/clients${search ? '?search=' + encodeURIComponent(search) : ''}`),
-    create: (data: any) => request<any>('/clients', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    list: (search?: string) => request<Client[]>(`/clients${search ? '?search=' + encodeURIComponent(search) : ''}`),
+    create: (data: Partial<Client>) => request<Client>('/clients', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Client>) => request<void>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/clients/${id}`, { method: 'DELETE' }),
     templateUrl: () => `${BASE}/clients/import-csv/template`,
     importCsv: (file: File) => {
@@ -176,9 +151,9 @@ export const api = {
       if (desde) params.set('desde', desde);
       if (hasta) params.set('hasta', hasta);
       const qs = params.toString();
-      return request<any[]>(`/orders${qs ? '?' + qs : ''}`);
+      return request<Order[]>(`/orders${qs ? '?' + qs : ''}`);
     },
-    create: (data: any) => request<any>('/orders', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: any) => request<{ id: number }>('/orders', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     // KAN-16: único camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
     updateStatus: (id: number, estado: string) => request<void>(`/orders/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
@@ -200,11 +175,11 @@ export const api = {
       if (sku) params.set('sku', sku);
       if (nombre) params.set('nombre', nombre);
       const qs = params.toString();
-      return request<any[]>(`/products${qs ? '?' + qs : ''}`);
+      return request<Product[]>(`/products${qs ? '?' + qs : ''}`);
     },
     categories: () => request<string[]>('/products/categories'),
-    create: (data: any) => request<any>('/products', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    create: (data: Partial<Product>) => request<Product>('/products', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Product>) => request<void>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     // KAN-23: la imagen se sube en un endpoint dedicado para no cambiar el contrato JSON.
     uploadImage: (id: number, file: File) => {
       const body = new FormData();
@@ -232,9 +207,9 @@ export const api = {
   },
 
   sellers: {
-    list: (onlyActive?: boolean) => request<any[]>(`/sellers${onlyActive ? '?onlyActive=true' : ''}`),
-    create: (data: any) => request<any>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    list: (onlyActive?: boolean) => request<Seller[]>(`/sellers${onlyActive ? '?onlyActive=true' : ''}`),
+    create: (data: Partial<Seller>) => request<Seller>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Seller>) => request<void>(`/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/sellers/${id}`, { method: 'DELETE' }),
   },
 
@@ -243,7 +218,7 @@ export const api = {
   },
 
   notifications: {
-    list: (take = 60) => request<any>(`/notifications?take=${take}`),
+    list: (take = 60) => request<{ items: any[]; resumen: NotificationsSummary }>(`/notifications?take=${take}`),
   },
 
   reports: (filtros?: FiltrosReporteParams) =>
@@ -272,8 +247,8 @@ export const api = {
   },
 
   users: {
-    list: () => request<any[]>('/users'),
-    create: (data: any) => request<any>('/users', { method: 'POST', body: JSON.stringify(data) }),
+    list: () => request<User[]>('/users'),
+    create: (data: any) => request<User>('/users', { method: 'POST', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
   },
 };
