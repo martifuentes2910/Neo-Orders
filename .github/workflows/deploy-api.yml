@@ -1,0 +1,47 @@
+name: Deploy API (Azure App Service)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "GitHub environment name (optional)"
+        required: false
+        default: "production"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      DOTNET_VERSION: "10.0.x"
+      PUBLISH_DIR: ./publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore NeoOrdersApp.slnx
+
+      - name: Build
+        run: dotnet build NeoOrdersApp.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test NeoOrdersApp.slnx -c Release --no-build --verbosity normal
+
+      - name: Publish
+        run: dotnet publish backend/src/NeoOrders.Api/NeoOrders.Api.csproj -c Release -o ${{ env.PUBLISH_DIR }}
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.PUBLISH_DIR }}

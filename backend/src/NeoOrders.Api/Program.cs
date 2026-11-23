@@ -120,17 +120,27 @@ builder.Services.AddAntiforgery(options =>
 });
 
 // CORS
+var frontendOrigins = builder.Configuration.GetSection("Frontend:Origins").Get<string[]>();
+if (frontendOrigins is null || frontendOrigins.Length == 0)
+{
+    var csv = builder.Configuration["Frontend:Origins"];
+    frontendOrigins = !string.IsNullOrWhiteSpace(csv)
+        ? csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        : [
+            "http://localhost:5173",
+            "https://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173"
+        ];
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5173",
-                "https://localhost:5173",
-                "http://127.0.0.1:5173",
-                "https://127.0.0.1:5173",
-                "http://localhost:4173",
-                "http://127.0.0.1:4173")
+        policy.WithOrigins(frontendOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -158,14 +168,24 @@ if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
         db.Database.Migrate();
-        await DbSeeder.SeedAsync(scope.ServiceProvider);
+        var seedOnStartup = builder.Configuration.GetValue<bool?>("Seed:RunOnStartup")
+            ?? app.Environment.IsDevelopment();
+        if (seedOnStartup)
+        {
+            await DbSeeder.SeedAsync(scope.ServiceProvider);
+            logger.LogInformation("Seed de inicio ejecutado.");
+        }
+        else
+        {
+            logger.LogInformation("Seed de inicio omitido por configuración.");
+        }
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "Error al migrar/sembrar la base de datos.");
     }
 }
