@@ -18,45 +18,20 @@ public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IOrderService _orderService;
+    private readonly IOrderQueryService _orderQuery;
     private readonly ICsvImportService _csvImport;
-    public OrdersController(AppDbContext db, IOrderService orderService, ICsvImportService csvImport)
+    public OrdersController(AppDbContext db, IOrderService orderService, IOrderQueryService orderQuery, ICsvImportService csvImport)
     {
         _db = db;
         _orderService = orderService;
+        _orderQuery = orderQuery;
         _csvImport = csvImport;
     }
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? estado, [FromQuery] int? clientId, [FromQuery] int? sellerId)
     {
-        var q = _db.Orders.Include(p => p.Client).Include(p => p.Seller).AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.Trim().ToLower();
-            q = q.Where(p => p.ProductName.ToLower().Contains(s) ||
-                             (p.Client != null && p.Client.Nombre.ToLower().Contains(s)));
-        }
-        if (!string.IsNullOrWhiteSpace(estado) && estado != "All" && estado != "Todos")
-            q = q.Where(p => p.Estado == estado);
-        if (clientId.HasValue) q = q.Where(p => p.ClientId == clientId.Value);
-        if (sellerId.HasValue) q = q.Where(p => p.SellerId == sellerId.Value);
-
-        var list = await q.OrderByDescending(p => p.Fecha).Select(p => new
-        {
-            p.Id,
-            p.ClientId,
-            ClientName = p.Client != null ? p.Client.Nombre : "",
-            ClientEmail = p.Client != null ? p.Client.Email : "",
-            p.SellerId,
-            SellerName = p.Seller != null ? p.Seller.Name : "",
-            p.ProductId,
-            p.ProductName,
-            p.Cantidad,
-            p.PrecioUnitario,
-            p.Total,
-            p.Fecha,
-            p.Estado
-        }).ToListAsync();
+        var list = await _orderQuery.ListAsync(search, estado, clientId, sellerId);
         return Ok(list);
     }
 
