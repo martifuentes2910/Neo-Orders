@@ -453,6 +453,17 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task GetConfigCompany_SinAuth_Retorna401()
+    {
+        using var client = CreateAnonymousClient();
+
+        var response = await client.GetAsync("/api/config/company");
+
+        // El challenge de la cookie de Identity se convierte en 401 (sin redirect).
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetConfigCompany_SinRolAdmin_Retorna403()
     {
         using var auth = _factory.CreateClientWithTestAuth();

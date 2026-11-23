@@ -147,8 +147,11 @@ public class NotificationsReportsContractTests : IClassFixture<NeoOrdersApiFacto
 
     [Theory]
     [InlineData("/api/reports/productos-vendidos?page=0", "page")]
+    [InlineData("/api/reports/clientes-compras?page=0", "page")]
     [InlineData("/api/reports/ventas-vendedor?pageSize=101", "pageSize")]
+    [InlineData("/api/reports/productos-vendidos?pageSize=101", "pageSize")]
     [InlineData("/api/reports/clientes-compras?pageSize=101", "pageSize")]
+    [InlineData("/api/reports/ventas-vendedor?pageSize=0", "pageSize")]
     public async Task GetReportesDetalle_PaginacionInvalida_Retorna400ConMessage(string url, string campo)
     {
         using var auth = _factory.CreateClientWithTestAuth();

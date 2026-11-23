@@ -3,6 +3,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using NeoOrders.Application.Contracts.Productos;
 using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
@@ -88,15 +91,38 @@ public class ProductsContractTests : IClassFixture<NeoOrdersApiFactory>
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
         var productId = await SeedProductAsync(auth);
-        using var form = new MultipartFormDataContent();
-        var png = new ByteArrayContent(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
-        png.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        form.Add(png, "file", "producto.png");
+        using var form = CreateValidPngForm();
 
         var response = await auth.Client.PostAsync($"/api/products/{productId}/image", form);
 
         await AssertBadRequestMessageAsync(response,
             "Almacenamiento de imágenes no configurado. Definí Cloudinary__CloudName, Cloudinary__ApiKey y Cloudinary__ApiSecret.");
+    }
+
+    /// <summary>
+    /// El guard de storage no configurado se evalúa antes que la existencia del
+    /// producto, así que para alcanzar la rama NOT_FOUND se sustituye el storage
+    /// por un stub configurado, aislado en esta factory derivada. El contrato
+    /// observable del controller es 404 { message = "Producto no encontrado." }.
+    /// </summary>
+    [Fact]
+    public async Task PostProductImage_ProductoInexistenteConStorage_Retorna404Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(
+            roles: ["Admin"],
+            configureServices: services =>
+            {
+                services.RemoveAll<IProductImageStorage>();
+                services.AddSingleton<IProductImageStorage, ConfiguredImageStorageStub>();
+            });
+        var missingId = await GetMissingProductIdAsync(auth);
+        using var form = CreateValidPngForm();
+
+        var response = await auth.Client.PostAsync($"/api/products/{missingId}/image", form);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Producto no encontrado.", GetProperty(doc.RootElement, "message").GetString());
     }
 
     /// <summary>
@@ -270,6 +296,31 @@ public class ProductsContractTests : IClassFixture<NeoOrdersApiFactory>
         var form = new MultipartFormDataContent();
         form.Add(new StringContent("ignored"), "otroCampo");
         return form;
+    }
+
+    /// <summary>Archivo PNG válido para ProductImageValidator (firma + extensión + content-type).</summary>
+    private static MultipartFormDataContent CreateValidPngForm()
+    {
+        var form = new MultipartFormDataContent();
+        var png = new ByteArrayContent(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        png.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(png, "file", "producto.png");
+        return form;
+    }
+
+    /// <summary>
+    /// Storage configurado de prueba: permite a ProductService.UploadImageAsync
+    /// pasar el guard de configuración y llegar a la búsqueda del producto.
+    /// UploadAsync no debe invocarse en el caso inexistente.
+    /// </summary>
+    private sealed class ConfiguredImageStorageStub : IProductImageStorage
+    {
+        public bool IsConfigured => true;
+
+        public Task<StoredImage> UploadAsync(byte[] content, string fileName, CancellationToken ct = default) =>
+            throw new InvalidOperationException("El producto inexistente no debe llegar a UploadAsync.");
+
+        public Task DeleteAsync(string? publicId, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private static async Task AssertBadRequestMessageAsync(HttpResponseMessage response, string expectedMessage)
