@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -73,6 +74,59 @@ public class ProductsContractTests : IClassFixture<NeoOrdersApiFactory>
         var response = await auth.Client.PostAsync($"/api/products/{productId}/image", form);
 
         await AssertBadRequestFileRequiredAsync(response);
+    }
+
+    /// <summary>
+    /// Smoke del endpoint de subida con un archivo válido. En Testing no hay
+    /// credenciales de Cloudinary, así que el contrato observable es 400 con el
+    /// mensaje de "no configurado" (guard de ProductService.UploadImageAsync).
+    /// Cubre el binding multipart y el dispatch al servicio, no cubiertos por
+    /// PostProductImage_SinArchivo.
+    /// </summary>
+    [Fact]
+    public async Task PostProductImage_ArchivoValidoSinCloudinary_Retorna400ConMessage()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var productId = await SeedProductAsync(auth);
+        using var form = new MultipartFormDataContent();
+        var png = new ByteArrayContent(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        png.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(png, "file", "producto.png");
+
+        var response = await auth.Client.PostAsync($"/api/products/{productId}/image", form);
+
+        await AssertBadRequestMessageAsync(response,
+            "Almacenamiento de imágenes no configurado. Definí Cloudinary__CloudName, Cloudinary__ApiKey y Cloudinary__ApiSecret.");
+    }
+
+    /// <summary>
+    /// Happy path de DELETE /api/products/{id}/image: con storage no configurado,
+    /// RemoveImageAsync igual limpia ImageUrl/ImagePublicId y devuelve 204.
+    /// </summary>
+    [Fact]
+    public async Task DeleteProductImage_Existente_Retorna204YLimpiaImagen()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var productId = await SeedProductAsync(auth);
+        await auth.QueryDbAsync(async db =>
+        {
+            var product = (await db.Products.FindAsync(productId))!;
+            product.ImageUrl = "https://res.cloudinary.com/test/image/upload/sample.png";
+            product.ImagePublicId = "neoorders/products/sample";
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        var response = await auth.Client.DeleteAsync($"/api/products/{productId}/image");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var image = await auth.QueryDbAsync(async db =>
+        {
+            var product = (await db.Products.FindAsync(productId))!;
+            return (product.ImageUrl, product.ImagePublicId);
+        });
+        Assert.Null(image.ImageUrl);
+        Assert.Null(image.ImagePublicId);
     }
 
     [Fact]

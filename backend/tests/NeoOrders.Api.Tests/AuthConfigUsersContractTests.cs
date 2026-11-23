@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
@@ -105,6 +107,55 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         using var doc = await ReadJsonAsync(response);
         Assert.Equal("Credenciales inválidas", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    /// <summary>
+    /// Smoke del flujo de entrada de la UI: POST /api/auth/login con credenciales
+    /// válidas devuelve 200 y el shape UserDto que consume AuthContext. El usuario
+    /// se siembra en la factory base, que es la misma que usa el cliente anónimo.
+    /// </summary>
+    [Fact]
+    public async Task PostAuthLogin_CredencialesValidas_Retorna200ConShapeYRoles()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var email = $"login.ok.{suffix}@test.local";
+        const string password = "Clave123!";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            if (!await roleManager.RoleExistsAsync("Empleado"))
+                Assert.True((await roleManager.CreateAsync(new IdentityRole("Empleado"))).Succeeded);
+
+            var created = await userManager.CreateAsync(new ApplicationUser
+            {
+                Id = $"login-ok-{suffix}",
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                Nombre = "Login",
+                Apellido = "Ok"
+            }, password);
+            Assert.True(created.Succeeded, string.Join(" ", created.Errors.Select(e => e.Description)));
+
+            var user = await userManager.FindByEmailAsync(email);
+            Assert.NotNull(user);
+            Assert.True((await userManager.AddToRoleAsync(user, "Empleado")).Succeeded);
+        }
+
+        using var client = CreateAnonymousClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        Assert.Equal(email, GetProperty(root, "email").GetString());
+        Assert.Equal("Login", GetProperty(root, "nombre").GetString());
+        Assert.Equal("Ok", GetProperty(root, "apellido").GetString());
+        var roles = GetProperty(root, "roles");
+        Assert.Equal(JsonValueKind.Array, roles.ValueKind);
+        Assert.Contains("Empleado", roles.EnumerateArray().Select(r => r.GetString()).ToList());
     }
 
     [Fact]
