@@ -40,6 +40,23 @@ public class CsvImportContractTests
         var errors = doc.RootElement.GetProperty("errors");
         Assert.Equal(JsonValueKind.Array, errors.ValueKind);
         Assert.Equal(1, errors.GetArrayLength());
-        Assert.Equal("Sku", errors[0].GetProperty("field").GetString());
+        var error = errors[0];
+        Assert.Equal(3, error.GetProperty("row").GetInt32());
+        Assert.Equal("Sku", error.GetProperty("field").GetString());
+        Assert.Equal("X", error.GetProperty("value").GetString());
+        Assert.Equal("Error", error.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public void CsvImportResultDto_EmptyErrors_SerializesAsEmptyArray()
+    {
+        var dto = new CsvImportResultDto { TotalRows = 1, ValidRows = 1, Imported = 1, Errors = [] };
+
+        var json = JsonSerializer.Serialize(dto, JsonOptions);
+        using var doc = JsonDocument.Parse(json);
+
+        var errors = doc.RootElement.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.Equal(0, errors.GetArrayLength());
     }
 }

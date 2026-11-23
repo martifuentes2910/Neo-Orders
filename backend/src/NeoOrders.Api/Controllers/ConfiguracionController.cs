@@ -33,7 +33,8 @@ public class ConfiguracionController : ControllerBase
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized(new { message = "No autenticado." });
-        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta });
+        var roles = await _userManager.GetRolesAsync(user);
+        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta, Roles = roles.ToList() });
     }
 
     [HttpPut("profile")]
@@ -47,7 +48,8 @@ public class ConfiguracionController : ControllerBase
         if (!string.IsNullOrWhiteSpace(dto.Tema)) user.Tema = dto.Tema;
         if (!string.IsNullOrWhiteSpace(dto.Paleta)) user.Paleta = dto.Paleta;
         await _userManager.UpdateAsync(user);
-        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta });
+        var roles = await _userManager.GetRolesAsync(user);
+        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta, Roles = roles.ToList() });
     }
 
     [HttpPost("seed")]

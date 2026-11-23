@@ -25,4 +25,19 @@ public class PaginacionTests
         var ex = Assert.Throws<PaginacionInvalidaException>(() => Paginacion.Crear(1, 101));
         Assert.Contains("pageSize", ex.Message);
     }
+
+    [Fact]
+    public void Crear_PageSizeCero_Lanza()
+    {
+        var ex = Assert.Throws<PaginacionInvalidaException>(() => Paginacion.Crear(1, 0));
+        Assert.Contains("pageSize", ex.Message);
+    }
+
+    [Fact]
+    public void Crear_PageSizeMaximo_EsValido()
+    {
+        var p = Paginacion.Crear(2, Paginacion.TamanoMaximo);
+        Assert.Equal(2, p.Pagina);
+        Assert.Equal(Paginacion.TamanoMaximo, p.TamanoPagina);
+    }
 }
