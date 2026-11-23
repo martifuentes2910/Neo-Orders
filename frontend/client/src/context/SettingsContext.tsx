@@ -13,10 +13,10 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-function toCompany(data: any): CompanySettings {
+function toCompany(data: Partial<CompanySettings> | null | undefined): CompanySettings {
   return {
-    id: data.id,
-    nombreEmpresa: data.nombreEmpresa,
+    id: data?.id,
+    nombreEmpresa: data?.nombreEmpresa ?? 'NeoOrders',
   };
 }
 

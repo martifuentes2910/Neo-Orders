@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import type { Seller } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,7 @@ export default function Vendedores() {
   const [search, setSearch] = useState('');
   const [activoFilter, setActivoFilter] = useState('Todos');
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<Seller | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -48,7 +49,7 @@ export default function Vendedores() {
   useEffect(() => { load(); }, []);
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setErrors({}); setShowForm(true); };
-  const openEdit = (s: any) => { setEditing(s); setForm({ name: s.name, email: s.email, phone: s.phone || '', commissionPercentage: s.commissionPercentage, active: s.active }); setErrors({}); setShowForm(true); };
+  const openEdit = (s: Seller) => { setEditing(s); setForm({ name: s.name, email: s.email, phone: s.phone || '', commissionPercentage: s.commissionPercentage, active: s.active }); setErrors({}); setShowForm(true); };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -66,8 +67,8 @@ export default function Vendedores() {
       toast.success(editing ? 'Vendedor actualizado' : 'Vendedor creado');
       setShowForm(false);
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setSaving(false);
     }
@@ -80,8 +81,8 @@ export default function Vendedores() {
       await api.sellers.remove(id);
       toast.success('Vendedor eliminado');
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setDeleting(null);
     }

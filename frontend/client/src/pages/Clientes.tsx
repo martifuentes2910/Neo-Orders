@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { api } from '../api';
+import type { Client } from '../types';
 import { Plus, Pencil, Trash2, Search, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import CsvImportDialog from '@/components/CsvImportDialog';
 
-let cachedClientes: any[] | null = null;
+let cachedClientes: Client[] | null = null;
 
 const schema = z.object({
   nombre: z.string().min(2, 'Nombre inválido'),
@@ -39,7 +40,7 @@ export default function Clientes() {
   const [loading, setLoading] = useState(!cachedClientes);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<Client | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -85,9 +86,9 @@ export default function Clientes() {
   }, [search]);
 
   const openCreate = () => { setEditing(null); reset(emptyForm); setShowForm(true); };
-  const openEdit = (c: any) => { setEditing(c); reset({ nombre: c.nombre, email: c.email, telefono: c.telefono || '', direccion: c.direccion || '' }); setShowForm(true); };
+  const openEdit = (c: Client) => { setEditing(c); reset({ nombre: c.nombre, email: c.email, telefono: c.telefono || '', direccion: c.direccion || '' }); setShowForm(true); };
 
-  const save = async (data: any) => {
+  const save = async (data: { nombre: string; email: string; telefono?: string; direccion?: string }) => {
     setSaving(true);
     try {
       if (editing) await api.clients.update(editing.id, { ...data, id: editing.id });
@@ -95,8 +96,8 @@ export default function Clientes() {
       toast.success(editing ? 'Cliente actualizado' : 'Cliente creado');
       setShowForm(false);
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setSaving(false);
     }
@@ -109,8 +110,8 @@ export default function Clientes() {
       await api.clients.remove(id);
       toast.success('Cliente eliminado');
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setDeleting(null);
     }

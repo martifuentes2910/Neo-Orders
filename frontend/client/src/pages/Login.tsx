@@ -31,8 +31,9 @@ export default function Login() {
     try {
       await login(email, password);
       navigate('/panel');
-    } catch (err: any) {
-      setError(err.message === 'UNAUTHORIZED' ? 'Credenciales inválidas. Verificá tu email y contraseña.' : err.message || 'Error al iniciar sesión');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión';
+      setError(msg === 'UNAUTHORIZED' ? 'Credenciales inválidas. Verificá tu email y contraseña.' : msg);
     } finally {
       setSubmitting(false);
     }
