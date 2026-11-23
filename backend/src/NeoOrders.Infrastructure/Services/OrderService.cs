@@ -160,7 +160,7 @@ public class OrderService : IOrderService
         if (currentStatus == newStatus)
             return new OrderResult { Success = true, OrderId = order.Id, ProductName = order.ProductName };
 
-        if (currentStatus == OrderStatus.Pendiente && newStatus == OrderStatus.Procesado)
+        if (OrderStatuses.DecreasesStock(currentStatus, newStatus))
         {
             if (!order.ProductId.HasValue)
                 return new OrderResult { Success = false, Error = "No se puede procesar: el pedido no tiene un producto de catálogo asociado" };
@@ -173,7 +173,7 @@ public class OrderService : IOrderService
 
             product.Stock -= order.Cantidad;
         }
-        else if (currentStatus == OrderStatus.Procesado && newStatus == OrderStatus.Cancelado)
+        else if (OrderStatuses.RestoresStock(currentStatus, newStatus))
         {
             if (!order.ProductId.HasValue)
                 return new OrderResult { Success = false, Error = "No se puede cancelar: el pedido no tiene un producto de catálogo asociado para reembolsar stock" };

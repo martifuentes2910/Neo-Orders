@@ -26,4 +26,11 @@ public static class OrderStatuses
 
     public static bool CanTransition(OrderStatus from, OrderStatus to) =>
         CanTransition(from.ToExternal(), to.ToExternal());
+
+    // KAN-38: efectos de stock de las transiciones, regla pura de dominio.
+    public static bool DecreasesStock(OrderStatus from, OrderStatus to) =>
+        from == OrderStatus.Pendiente && to == OrderStatus.Procesado;
+
+    public static bool RestoresStock(OrderStatus from, OrderStatus to) =>
+        from == OrderStatus.Procesado && to == OrderStatus.Cancelado;
 }
