@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
@@ -198,6 +199,46 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var doc = await ReadJsonAsync(response);
         Assert.Equal("El ID de la ruta no coincide con el cuerpo.", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
+    public async Task PutOrder_Inexistente_Retorna404Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var missingOrderId = await auth.QueryDbAsync(async db =>
+            (await db.Orders.Select(o => o.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/orders/{missingOrderId}", new
+        {
+            id = missingOrderId,
+            clientId,
+            sellerId,
+            productId,
+            productName = "Producto Contrato",
+            cantidad = 1,
+            precioUnitario = 10.50m,
+            estado = "Pendiente"
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Pedido no encontrado", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
+    public async Task GetOrderById_Existente_Retorna200()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        var response = await auth.Client.GetAsync($"/api/orders/{orderId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal(orderId, GetProperty(doc.RootElement, "id").GetInt32());
+        Assert.Equal(clientId, GetProperty(doc.RootElement, "clientId").GetInt32());
     }
 
     [Fact]

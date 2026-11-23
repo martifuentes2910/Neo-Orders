@@ -253,6 +253,145 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
             && GetProperty(e, "message").GetString()?.Contains("existe", StringComparison.OrdinalIgnoreCase) == true);
     }
 
+    [Fact]
+    public async Task PostOrdersImportCsv_OrderNumberDuplicadoEnArchivo_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productActive: true);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};1\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};2\n",
+            "pedidos-duplicados-en-archivo.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "OrderNumber", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("duplicado", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_OrderNumberMuyLargo_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productActive: true);
+        var orderNumber = new string('X', 51);
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};1\n",
+            "pedidos-ordernumber-largo.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "OrderNumber", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("50 caracteres", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_ClientIdInexistente_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (_, sellerId, productId) = await SeedCatalogAsync(auth, productActive: true);
+        var missingClientId = await auth.QueryDbAsync(async db =>
+            (await db.Clients.Select(c => c.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{missingClientId};{sellerId};{productId};1\n",
+            "pedidos-cliente-inexistente.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "ClientId", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("no existe", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_CantidadInvalida_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productActive: true);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{productId};0\n",
+            "pedidos-cantidad-invalida.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "Cantidad", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("Cantidad inválida", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_SellerIdInexistente_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, _, productId) = await SeedCatalogAsync(auth, productActive: true);
+        var missingSellerId = await auth.QueryDbAsync(async db =>
+            (await db.Sellers.Select(s => s.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{missingSellerId};{productId};1\n",
+            "pedidos-vendedor-inexistente.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "SellerId", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("no existe", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task PostOrdersImportCsv_ProductIdInexistente_Retorna400ConErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        var (clientId, sellerId, _) = await SeedCatalogAsync(auth, productActive: true);
+        var missingProductId = await auth.QueryDbAsync(async db =>
+            (await db.Products.Select(p => p.Id).ToListAsync()).DefaultIfEmpty(0).Max() + 1);
+        var orderNumber = $"CSV-{Guid.NewGuid():N}"[..20];
+
+        using var form = CreateForm(
+            "OrderNumber;ClientId;SellerId;ProductId;Cantidad\n" +
+            $"{orderNumber};{clientId};{sellerId};{missingProductId};1\n",
+            "pedidos-producto-inexistente.csv");
+
+        var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var errors = AssertImportErrorsWithShape(doc.RootElement);
+        Assert.Contains(errors, e =>
+            string.Equals(GetProperty(e, "field").GetString(), "ProductId", StringComparison.OrdinalIgnoreCase)
+            && GetProperty(e, "message").GetString()?.Contains("no existe", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
     /// <summary>
     /// Formulario multipart válido que no contiene el campo "file": un form
     /// vacío es serializado por HttpClient como una sección inválida.
