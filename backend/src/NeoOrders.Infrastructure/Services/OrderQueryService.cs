@@ -42,4 +42,27 @@ public class OrderQueryService : IOrderQueryService
             OrderNumber = p.OrderNumber
         }).ToListAsync();
     }
+
+    public async Task<OrderListItemDto?> GetByIdAsync(int id)
+    {
+        return await _db.Orders.Include(p => p.Client).Include(p => p.Seller).AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new OrderListItemDto
+            {
+                Id = p.Id,
+                ClientId = p.ClientId,
+                ClientName = p.Client != null ? p.Client.Nombre : "",
+                ClientEmail = p.Client != null ? p.Client.Email : "",
+                SellerId = p.SellerId,
+                SellerName = p.Seller != null ? p.Seller.Name : "",
+                ProductId = p.ProductId,
+                ProductName = p.ProductName,
+                Cantidad = p.Cantidad,
+                PrecioUnitario = p.PrecioUnitario,
+                Total = p.Total,
+                Fecha = p.Fecha,
+                Estado = p.Estado,
+                OrderNumber = p.OrderNumber
+            }).FirstOrDefaultAsync();
+    }
 }

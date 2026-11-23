@@ -38,7 +38,7 @@ public class OrdersController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
     {
-        var p = await _db.Orders.Include(x => x.Client).Include(x => x.Seller).Include(x => x.Product).FirstOrDefaultAsync(x => x.Id == id);
+        var p = await _orderQuery.GetByIdAsync(id);
         if (p == null) return NotFound();
         return Ok(p);
     }
