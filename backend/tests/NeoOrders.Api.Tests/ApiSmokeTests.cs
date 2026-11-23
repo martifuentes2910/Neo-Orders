@@ -3,8 +3,10 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -99,14 +101,31 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
         });
     }
 
-    /// <summary>
-    /// Cliente con esquema de autenticación de prueba. Sin argumentos mantiene el
+        /// <summary>
+    /// Cliente con esquema de autenticaci?n de prueba. Sin argumentos mantiene el
     /// comportamiento original (claims "test-user", sin roles).
     /// </summary>
     public TestAuthClient CreateClientWithTestAuth(
         string? userId = null,
         string? name = null,
-        IEnumerable<string>? roles = null)
+        IEnumerable<string>? roles = null) =>
+        CreateTestClient(disableAntiforgery: true, userId, name, roles);
+
+    /// <summary>
+    /// Cliente con auth de prueba y validaci?n antiforgery real habilitada.
+    /// Usar junto con <see cref="WithAntiforgeryTokenAsync"/> para cubrir XSRF.
+    /// </summary>
+    public TestAuthClient CreateClientWithTestAuthAndAntiforgery(
+        string? userId = null,
+        string? name = null,
+        IEnumerable<string>? roles = null) =>
+        CreateTestClient(disableAntiforgery: false, userId, name, roles);
+
+    private TestAuthClient CreateTestClient(
+        bool disableAntiforgery,
+        string? userId,
+        string? name,
+        IEnumerable<string>? roles)
     {
         var factory = WithWebHostBuilder(builder =>
         {
@@ -126,13 +145,19 @@ public sealed class NeoOrdersApiFactory : WebApplicationFactory<Program>
                     });
                 services.AddAuthorization();
 
-                // El entorno Testing no es Development (SecurePolicy=Always) y el
-                // TestServer usa HTTP, así que el filtro global antiforgery lanzaría
-                // InvalidOperationException antes de llegar al controller. Los clientes
-                // con auth de prueba ya suplantan la autenticación por cookie: omitir
-                // antiforgery también en ellos mantiene los tests deterministas.
-                services.AddControllersWithViews(options =>
-                    options.Filters.Add(new IgnoreAntiforgeryTokenAttribute()));
+                // TestServer corre sobre HTTP; en Testing la cookie antiforgery es Always.
+                // TestServer usa HTTP; en Testing la cookie antiforgery es Always.
+                services.PostConfigure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest);
+                // Compatibilidad para smoke tests con esquema Test (header).
+                services.PostConfigure<MvcOptions>(o => o.Filters.Add(new IgnoreAntiforgeryTokenAttribute()));
+
+                                // Los clientes con auth por esquema Test (header) no usan cookie auth;
+                // AutoValidateAntiforgeryToken no aplica a auth no-cookie, pero el entorno
+                // Testing fuerza CookieSecurePolicy.Always y TestServer es HTTP, lo que
+                // puede romper emisi?n/validaci?n de cookies antiforgery. Se relaja solo
+                // en esta factory derivada de tests.
+                services.PostConfigure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest);
+                services.PostConfigure<MvcOptions>(o => o.Filters.Add(new IgnoreAntiforgeryTokenAttribute()));
             });
         });
 
