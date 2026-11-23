@@ -83,7 +83,7 @@ public class OrderService : IOrderService
                 Error = $"Transición de estado no permitida: {existing.Estado} → {estado}"
             };
 
-        await using var tx = await _db.Database.BeginTransactionAsync();
+        var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync() : null;
         try
         {
             // KAN-13: identidad del producto y precio histórico intactos.
@@ -95,18 +95,22 @@ public class OrderService : IOrderService
             var transition = await ApplyStatusTransitionAsync(existing, estado);
             if (!transition.Success)
             {
-                await tx.RollbackAsync();
+                if (tx != null) await tx.RollbackAsync();
                 return transition;
             }
 
             await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+            if (tx != null) await tx.CommitAsync();
             return new OrderResult { Success = true, OrderId = id, ProductName = existing.ProductName };
         }
         catch
         {
-            await tx.RollbackAsync();
+            if (tx != null) await tx.RollbackAsync();
             throw;
+        }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
         }
     }
 
@@ -124,24 +128,28 @@ public class OrderService : IOrderService
                 Error = $"Transición de estado no permitida: {existing.Estado} → {estado}"
             };
 
-        await using var tx = await _db.Database.BeginTransactionAsync();
+        var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync() : null;
         try
         {
             var transition = await ApplyStatusTransitionAsync(existing, estado);
             if (!transition.Success)
             {
-                await tx.RollbackAsync();
+                if (tx != null) await tx.RollbackAsync();
                 return transition;
             }
 
             await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+            if (tx != null) await tx.CommitAsync();
             return new OrderResult { Success = true, OrderId = id, ProductName = existing.ProductName };
         }
         catch
         {
-            await tx.RollbackAsync();
+            if (tx != null) await tx.RollbackAsync();
             throw;
+        }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
         }
     }
 
@@ -196,8 +204,12 @@ public class OrderService : IOrderService
     private async Task<Product?> GetProductForStockUpdateAsync(int productId)
     {
         // KAN-35: bloqueo de fila para evitar oversell/reembolsos concurrentes inconsistentes.
-        return await _db.Products
-            .FromSqlRaw("SELECT * FROM Products WITH (UPDLOCK, ROWLOCK) WHERE Id = {0}", productId)
-            .FirstOrDefaultAsync();
+        if (_db.Database.IsRelational())
+        {
+            return await _db.Products
+                .FromSqlRaw("SELECT * FROM Products WITH (UPDLOCK, ROWLOCK) WHERE Id = {0}", productId)
+                .FirstOrDefaultAsync();
+        }
+        return await _db.Products.FirstOrDefaultAsync(p => p.Id == productId);
     }
 }

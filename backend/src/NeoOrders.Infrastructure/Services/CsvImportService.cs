@@ -90,10 +90,22 @@ public sealed class CsvImportService : ICsvImportService
         result.ValidRows = candidates.Count - errors.Count(e => e.Field == "Email" && e.Message.Contains("base de datos"));
         if (errors.Count > 0) { result.ValidRows = 0; return result; }
 
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
-        _db.Clients.AddRange(candidates);
-        await _db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(ct) : null;
+        try
+        {
+            _db.Clients.AddRange(candidates);
+            await _db.SaveChangesAsync(ct);
+            if (tx != null) await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            if (tx != null) await tx.RollbackAsync(ct);
+            throw;
+        }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
+        }
 
         result.ValidRows = candidates.Count;
         result.Imported = candidates.Count;
@@ -183,10 +195,22 @@ public sealed class CsvImportService : ICsvImportService
 
         if (errors.Count > 0) { result.ValidRows = 0; return result; }
 
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
-        _db.Products.AddRange(candidates);
-        await _db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(ct) : null;
+        try
+        {
+            _db.Products.AddRange(candidates);
+            await _db.SaveChangesAsync(ct);
+            if (tx != null) await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            if (tx != null) await tx.RollbackAsync(ct);
+            throw;
+        }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
+        }
 
         result.ValidRows = candidates.Count;
         result.Imported = candidates.Count;
@@ -305,10 +329,10 @@ public sealed class CsvImportService : ICsvImportService
             });
         }
 
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(ct) : null;
         _db.Orders.AddRange(entities);
         await _db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        if (tx != null) { await tx.CommitAsync(ct); await tx.DisposeAsync(); }
 
         result.ValidRows = entities.Count;
         result.Imported = entities.Count;
