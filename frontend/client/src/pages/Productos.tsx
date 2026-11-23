@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { api, type PriceAdjustmentPreviewResponse } from '../api';
+import { api } from '../api';
+import type { PriceAdjustmentPreviewResponse, Product } from '../types';
 import { Plus, Pencil, Trash2, Image as ImageIcon, Percent, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,7 @@ export default function Productos() {
   const [category, setCategory] = useState('Todos');
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -109,7 +110,7 @@ export default function Productos() {
   };
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setErrors({}); resetImageState(); setShowForm(true); };
-  const openEdit = (p: any) => {
+  const openEdit = (p: Product) => {
     setEditing(p);
     setForm({ sku: p.sku, name: p.name, category: p.category, basePrice: p.basePrice, cost: p.cost, stock: p.stock, minStockAlert: p.minStockAlert, active: p.active });
     setErrors({});
@@ -169,22 +170,22 @@ export default function Productos() {
       if (imageFile) {
         try {
           await api.products.uploadImage(id, imageFile);
-        } catch (err: any) {
-          toast.warning('Producto guardado, pero no se pudo subir la imagen', { description: err.message });
+        } catch (err: unknown) {
+          toast.warning('Producto guardado, pero no se pudo subir la imagen', { description: err instanceof Error ? err.message : 'Error inesperado' });
         }
       } else if (removeImage && editing) {
         try {
           await api.products.removeImage(id);
-        } catch (err: any) {
-          toast.warning('Producto guardado, pero no se pudo quitar la imagen', { description: err.message });
+        } catch (err: unknown) {
+          toast.warning('Producto guardado, pero no se pudo quitar la imagen', { description: err instanceof Error ? err.message : 'Error inesperado' });
         }
       }
 
       toast.success(editing ? 'Producto actualizado' : 'Producto creado');
       setShowForm(false);
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setSaving(false);
     }
@@ -213,9 +214,9 @@ export default function Productos() {
       const preview = await api.products.previewPriceAdjustment(percent);
       setAdjustPreview(preview);
       if (preview.errors.length > 0) setAdjustError(preview.errors[0]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAdjustPreview(null);
-      setAdjustError(err.message || 'No se pudo generar la vista previa.');
+      setAdjustError(err instanceof Error ? err.message : 'No se pudo generar la vista previa.');
     } finally {
       setAdjustLoading(false);
     }
@@ -232,8 +233,8 @@ export default function Productos() {
       setShowAdjust(false);
       setAdjustPreview(null);
       await load();
-    } catch (err: any) {
-      setAdjustError(err.message || 'No se pudo aplicar el ajuste.');
+    } catch (err: unknown) {
+      setAdjustError(err instanceof Error ? err.message : 'No se pudo aplicar el ajuste.');
     } finally {
       setAdjustApplying(false);
     }
@@ -246,8 +247,8 @@ export default function Productos() {
       await api.products.remove(id);
       toast.success('Producto eliminado');
       await load();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setDeleting(null);
     }
