@@ -41,13 +41,46 @@ public class ReportsController : ControllerBase
 
     [HttpGet("ventas-vendedor")]
     public async Task<IActionResult> VentasVendedor([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta, [FromQuery] int? sellerId, [FromQuery] string? estado, [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
-        => Ok(await _ventasVendedorService.ConsultarAsync(new FiltrosReporte { Desde = desde, Hasta = hasta, SellerId = sellerId, Estado = estado }, Paginacion.Crear(page, pageSize)));
+    {
+        try
+        {
+            var paginacion = Paginacion.Crear(page, pageSize);
+            var filtros = new FiltrosReporte { Desde = desde, Hasta = hasta, SellerId = sellerId, Estado = estado };
+            return Ok(await _ventasVendedorService.ConsultarAsync(filtros, paginacion));
+        }
+        catch (PaginacionInvalidaException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 
     [HttpGet("productos-vendidos")]
     public async Task<IActionResult> ProductosVendidos([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta, [FromQuery] string? estado, [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
-        => Ok(await _productosVendidosService.ConsultarAsync(new FiltrosReporte { Desde = desde, Hasta = hasta, Estado = estado }, Paginacion.Crear(page, pageSize)));
+    {
+        try
+        {
+            var paginacion = Paginacion.Crear(page, pageSize);
+            var filtros = new FiltrosReporte { Desde = desde, Hasta = hasta, Estado = estado };
+            return Ok(await _productosVendidosService.ConsultarAsync(filtros, paginacion));
+        }
+        catch (PaginacionInvalidaException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 
     [HttpGet("clientes-compras")]
     public async Task<IActionResult> ClientesCompras([FromQuery] DateTime? desde, [FromQuery] DateTime? hasta, [FromQuery] int? clientId, [FromQuery] string? estado, [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
-        => Ok(await _clientesConMasComprasService.ConsultarAsync(new FiltrosReporte { Desde = desde, Hasta = hasta, ClientId = clientId, Estado = estado }, Paginacion.Crear(page, pageSize)));
+    {
+        try
+        {
+            var paginacion = Paginacion.Crear(page, pageSize);
+            var filtros = new FiltrosReporte { Desde = desde, Hasta = hasta, ClientId = clientId, Estado = estado };
+            return Ok(await _clientesConMasComprasService.ConsultarAsync(filtros, paginacion));
+        }
+        catch (PaginacionInvalidaException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }
