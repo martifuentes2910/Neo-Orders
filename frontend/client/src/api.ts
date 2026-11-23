@@ -230,11 +230,11 @@ export const api = {
 
   reportesDetalle: {
     vendedores: (filtros?: FiltrosReporteParams) =>
-      request<VentasVendedorResponse>(`/reports/detalle/vendedores${buildReporteQuery(filtros)}`),
+      request<VentasVendedorResponse>(`/reports/ventas-vendedor${buildReporteQuery(filtros)}`),
     productos: (filtros?: FiltrosReporteParams) =>
-      request<ProductosVendidosResponse>(`/reports/detalle/productos${buildReporteQuery(filtros)}`),
+      request<ProductosVendidosResponse>(`/reports/productos-vendidos${buildReporteQuery(filtros)}`),
     clientes: (filtros?: FiltrosReporteParams) =>
-      request<ClientesComprasResponse>(`/reports/detalle/clientes${buildReporteQuery(filtros)}`),
+      request<ClientesComprasResponse>(`/reports/clientes-compras${buildReporteQuery(filtros)}`),
   },
 
   config: {
