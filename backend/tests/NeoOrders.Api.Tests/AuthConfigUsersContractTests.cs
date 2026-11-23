@@ -295,6 +295,118 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
         }, role);
     }
 
+    [Fact]
+    public async Task DeleteUsers_ConAdmin_IdExistente_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await SeedRoleViaUserAsync(auth, "Empleado");
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var email = $"users.delete.{suffix}@test.local";
+        var create = await auth.Client.PostAsJsonAsync("/api/users", new
+        {
+            nombre = "Borrar",
+            apellido = "Usuario",
+            email,
+            password = "Clave123!",
+            rol = "Empleado"
+        });
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        using var createdDoc = await ReadJsonAsync(create);
+        var id = GetProperty(createdDoc.RootElement, "id").GetString();
+
+        var response = await auth.Client.DeleteAsync($"/api/users/{id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PutUsersRol_ConAdmin_IdExistente_Retorna204()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await SeedRoleViaUserAsync(auth, "Empleado");
+        await SeedRoleViaUserAsync(auth, "Admin");
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var email = $"users.rol.{suffix}@test.local";
+        var create = await auth.Client.PostAsJsonAsync("/api/users", new
+        {
+            nombre = "Rol",
+            apellido = "Usuario",
+            email,
+            password = "Clave123!",
+            rol = "Empleado"
+        });
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        using var createdDoc = await ReadJsonAsync(create);
+        var id = GetProperty(createdDoc.RootElement, "id").GetString();
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/users/{id}/rol", new { rol = "Admin" });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostUsers_PasswordInvalida_Retorna400ConMessageYErrors()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await SeedRoleViaUserAsync(auth, "Empleado");
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var response = await auth.Client.PostAsJsonAsync("/api/users", new
+        {
+            nombre = "Bad",
+            apellido = "Password",
+            email = $"users.badpass.{suffix}@test.local",
+            password = "123",
+            rol = "Empleado"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        Assert.False(string.IsNullOrWhiteSpace(GetProperty(root, "message").GetString()));
+        var errors = GetProperty(root, "errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        Assert.NotEmpty(errors.EnumerateArray());
+    }
+
+    [Fact]
+    public async Task GetConfigCompany_SinRolAdmin_Retorna403()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+
+        var response = await auth.Client.GetAsync("/api/config/company");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetConfigCompany_ConRolAdmin_Retorna200()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+
+        var response = await auth.Client.GetAsync("/api/config/company");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        // Shape estable del DTO de empresa
+        _ = GetProperty(root, "nombreEmpresa");
+        _ = GetProperty(root, "moneda");
+    }
+
+    [Fact]
+    public async Task GetConfigProfile_SinAuth_Retorna401()
+    {
+        using var client = CreateAnonymousClient();
+
+        var response = await client.GetAsync("/api/config/profile");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     private HttpClient CreateAnonymousClient() =>
         _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
