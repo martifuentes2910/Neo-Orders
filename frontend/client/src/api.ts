@@ -7,6 +7,7 @@ import type {
   VentasVendedorResponse,
 } from './types/reportes';
 import type {
+  AppNotification,
   Client,
   CompanySettings,
   CsvImportResult,
@@ -154,8 +155,8 @@ export const api = {
       const qs = params.toString();
       return request<Order[]>(`/orders${qs ? '?' + qs : ''}`);
     },
-    create: (data: any) => request<{ id: number }>('/orders', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    create: (data: Pick<Order, 'clientId' | 'cantidad'> & { sellerId?: number | null; productId?: number | null; productName?: string; precioUnitario?: number; orderNumber?: string | null }) => request<{ id: number }>('/orders', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Pick<Order, 'id' | 'clientId' | 'cantidad' | 'estado'> & { sellerId?: number | null; productId?: number | null; productName?: string; precioUnitario?: number }) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     // KAN-16: único camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
     updateStatus: (id: number, estado: string) => request<void>(`/orders/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
     remove: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
@@ -219,7 +220,7 @@ export const api = {
   },
 
   notifications: {
-    list: (take = 60) => request<{ items: any[]; resumen: NotificationsSummary }>(`/notifications?take=${take}`),
+    list: (take = 60) => request<{ items: AppNotification[]; resumen: NotificationsSummary }>(`/notifications?take=${take}`),
   },
 
   reports: (filtros?: FiltrosReporteParams) =>
@@ -249,7 +250,7 @@ export const api = {
 
   users: {
     list: () => request<User[]>('/users'),
-    create: (data: any) => request<User>('/users', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: { nombre: string; apellido: string; email: string; password: string; rol: string; avatar?: string }) => request<{ id: string; email: string }>('/users', { method: 'POST', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
   },
 };
