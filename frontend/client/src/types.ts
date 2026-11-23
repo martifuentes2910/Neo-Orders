@@ -19,7 +19,7 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   Cancelado: [],
 };
 
-// KAN-16/KAN-35: estados con datos fijos; sólo se permite cambiar el estado.
+// KAN-16/KAN-35: estados con datos fijos; solo se permite cambiar el estado.
 export const ORDER_EDIT_LOCKED: OrderStatus[] = ['Procesado', 'Enviado', 'Entregado', 'Cancelado'];
 
 export const esEstadoBloqueado = (estado: OrderStatus): boolean => ORDER_EDIT_LOCKED.includes(estado);

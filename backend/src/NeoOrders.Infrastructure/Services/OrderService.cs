@@ -1,10 +1,8 @@
 using NeoOrders.Application.Contracts.Orders;
-using NeoOrders.Application.Contracts.Notifications;
-using NeoOrders.Application.Contracts.Import;
+using NeoOrders.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Infrastructure.Data;
 using NeoOrders.Infrastructure.Models;
-using NeoOrders.Domain.Orders;
 
 namespace NeoOrders.Infrastructure.Services;
 
@@ -16,13 +14,13 @@ public class OrderService : IOrderService
     public async Task<OrderResult> CreateAsync(int clientId, int? sellerId, int? productId, int cantidad, string? orderNumber = null)
     {
         if (!await _db.Clients.AnyAsync(c => c.Id == clientId))
-            return new OrderResult { Success = false, Error = "Cliente no v├ílido" };
+            return new OrderResult { Success = false, Error = "Cliente no válido" };
         if (sellerId.HasValue && !await _db.Sellers.AnyAsync(s => s.Id == sellerId.Value))
-            return new OrderResult { Success = false, Error = "Vendedor no v├ílido" };
+            return new OrderResult { Success = false, Error = "Vendedor no válido" };
         if (cantidad < 1)
-            return new OrderResult { Success = false, Error = "Cantidad inv├ílida" };
+            return new OrderResult { Success = false, Error = "Cantidad inválida" };
         if (!productId.HasValue)
-            return new OrderResult { Success = false, Error = "Debe seleccionar un producto del cat├ílogo" };
+            return new OrderResult { Success = false, Error = "Debe seleccionar un producto del catálogo" };
 
         var normalizedOrderNumber = string.IsNullOrWhiteSpace(orderNumber) ? null : orderNumber.Trim();
         if (normalizedOrderNumber != null)
@@ -33,11 +31,120 @@ public class OrderService : IOrderService
                 return new OrderResult { Success = false, Error = "OrderNumber ya existe" };
         }
 
-        // Nombre y precio son del cat├ílogo, nunca del payload del cliente (KAN-13).
         var prod = await _db.Products.FindAsync(productId.Value);
-        if (prod == null) return new OrderResult { Success = false, Error = "Producto no v├ílido" };
+        if (prod == null) return new OrderResult { Success = false, Error = "Producto no válido" };
 
-        // KAN-35/KAN-38: Única rutina de transición. Aplica efectos de stock y cambia estado.
+        var order = new Order
+        {
+            OrderNumber = normalizedOrderNumber,
+            ClientId = clientId,
+            SellerId = sellerId,
+            ProductId = productId,
+            ProductName = prod.Name,
+            Cantidad = cantidad,
+            PrecioUnitario = prod.BasePrice,
+            Total = cantidad * prod.BasePrice,
+            Fecha = DateTime.UtcNow,
+            Estado = OrderStatuses.Pendiente
+        };
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+        return new OrderResult { Success = true, OrderId = order.Id, ProductName = order.ProductName };
+    }
+
+    public async Task<OrderResult> UpdateAsync(int id, int clientId, int? sellerId, int cantidad, string estado)
+    {
+        var existing = await _db.Orders.FindAsync(id);
+        if (existing == null)
+            return new OrderResult { Success = false, NotFound = true, Error = "Pedido no encontrado" };
+        if (OrderStatuses.EditLocked.Contains(existing.Estado))
+            return new OrderResult { Success = false, Error = $"El pedido está {existing.Estado}: no se puede editar, solo cambiar el estado" };
+        if (!await _db.Clients.AnyAsync(c => c.Id == clientId))
+            return new OrderResult { Success = false, Error = "Cliente no válido" };
+        if (sellerId.HasValue && !await _db.Sellers.AnyAsync(s => s.Id == sellerId.Value))
+            return new OrderResult { Success = false, Error = "Vendedor no válido" };
+        if (cantidad < 1)
+            return new OrderResult { Success = false, Error = "Cantidad inválida" };
+        if (!OrderStatuses.IsValid(estado))
+            return new OrderResult { Success = false, Error = "Estado no válido" };
+        if (!OrderStatuses.CanTransition(existing.Estado, estado))
+            return new OrderResult { Success = false, Error = $"Transición de estado no permitida: {existing.Estado} → {estado}" };
+
+        var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync() : null;
+        try
+        {
+            existing.ClientId = clientId;
+            existing.SellerId = sellerId;
+            existing.Cantidad = cantidad;
+            existing.Total = cantidad * existing.PrecioUnitario;
+
+            var transition = await ApplyStatusTransitionAsync(existing, estado);
+            if (!transition.Success)
+            {
+                if (tx != null) await tx.RollbackAsync();
+                return transition;
+            }
+
+            await _db.SaveChangesAsync();
+            if (tx != null) await tx.CommitAsync();
+            return new OrderResult { Success = true, OrderId = id, ProductName = existing.ProductName };
+        }
+        catch
+        {
+            if (tx != null) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
+        }
+    }
+
+    public async Task<OrderResult> UpdateStatusAsync(int id, string estado)
+    {
+        var existing = await _db.Orders.FindAsync(id);
+        if (existing == null)
+            return new OrderResult { Success = false, NotFound = true, Error = "Pedido no encontrado" };
+        if (!OrderStatuses.IsValid(estado))
+            return new OrderResult { Success = false, Error = "Estado no válido" };
+        if (!OrderStatuses.CanTransition(existing.Estado, estado))
+            return new OrderResult { Success = false, Error = $"Transición de estado no permitida: {existing.Estado} → {estado}" };
+
+        var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync() : null;
+        try
+        {
+            var transition = await ApplyStatusTransitionAsync(existing, estado);
+            if (!transition.Success)
+            {
+                if (tx != null) await tx.RollbackAsync();
+                return transition;
+            }
+
+            await _db.SaveChangesAsync();
+            if (tx != null) await tx.CommitAsync();
+            return new OrderResult { Success = true, OrderId = id, ProductName = existing.ProductName };
+        }
+        catch
+        {
+            if (tx != null) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
+        }
+    }
+
+    public async Task<bool> DeleteAsync(int id)
+    {
+        var p = await _db.Orders.FindAsync(id);
+        if (p == null) return false;
+        _db.Orders.Remove(p);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    // KAN-35/KAN-38: Única rutina de transición. Aplica efectos de stock y cambia estado.
     // No llama SaveChanges; el caller controla transacción/persistencia.
     private async Task<OrderResult> ApplyStatusTransitionAsync(Order order, string newStatusRaw)
     {
@@ -84,7 +191,6 @@ public class OrderService : IOrderService
 
     private async Task<Product?> GetProductForStockUpdateAsync(int productId)
     {
-        // KAN-35: bloqueo de fila para evitar oversell/reembolsos concurrentes inconsistentes.
         if (_db.Database.IsRelational())
         {
             return await _db.Products
