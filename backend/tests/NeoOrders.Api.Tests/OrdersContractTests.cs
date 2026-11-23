@@ -59,6 +59,80 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task PostOrder_CantidadInvalida_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+
+        var response = await PostOrderAsync(auth.Client, clientId, sellerId, productId, cantidad: 0);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Cantidad inválida", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
+    public async Task PostOrder_OrderNumberDuplicado_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+
+        var first = await PostOrderAsync(auth.Client, clientId, sellerId, productId, orderNumber: "ON-001");
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+
+        var second = await PostOrderAsync(auth.Client, clientId, sellerId, productId, orderNumber: "ON-001");
+
+        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+        using var doc = await ReadJsonAsync(second);
+        Assert.Equal("OrderNumber ya existe", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
+    public async Task PostOrder_OrderNumberMuyLargo_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var orderNumber = new string('X', 51);
+
+        var response = await PostOrderAsync(auth.Client, clientId, sellerId, productId, orderNumber: orderNumber);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("OrderNumber no puede superar 50 caracteres", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
+    public async Task PostOrder_StockInsuficienteAlProcesar_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productStock: 1);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId, cantidad: 2);
+
+        var response = await auth.Client.PatchAsJsonAsync(
+            $"/api/orders/{orderId}/estado", new { estado = "Procesado" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var message = GetProperty(doc.RootElement, "message").GetString() ?? string.Empty;
+        Assert.Contains("Stock insuficiente", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PatchOrderStatus_EstadoInvalido_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        var response = await auth.Client.PatchAsJsonAsync(
+            $"/api/orders/{orderId}/estado", new { estado = "Inexistente" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Estado no válido", GetProperty(doc.RootElement, "message").GetString());
+    }
+
+    [Fact]
     public async Task PatchOrderStatus_TransicionValida_Retorna204()
     {
         using var auth = _factory.CreateClientWithTestAuth();
@@ -126,6 +200,59 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal("El ID de la ruta no coincide con el cuerpo.", GetProperty(doc.RootElement, "message").GetString());
     }
 
+    [Fact]
+    public async Task PutOrder_EditLocked_SoloPermiteCambioEstado()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth, productStock: 5);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        var processed = await auth.Client.PatchAsJsonAsync(
+            $"/api/orders/{orderId}/estado", new { estado = "Procesado" });
+        Assert.Equal(HttpStatusCode.NoContent, processed.StatusCode);
+
+        // En estado Procesado el controller ignora los campos editables y solo
+        // delega en UpdateStatusAsync: el cambio de cantidad no debe aplicarse.
+        var response = await auth.Client.PutAsJsonAsync($"/api/orders/{orderId}", new
+        {
+            id = orderId,
+            clientId,
+            sellerId,
+            productId,
+            productName = "Producto Contrato",
+            cantidad = 999,
+            precioUnitario = 10.50m,
+            estado = "Enviado"
+        });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var persisted = await auth.QueryDbAsync(async db =>
+        {
+            var order = await db.Orders.FindAsync(orderId);
+            return (Cantidad: order!.Cantidad, Estado: order.Estado);
+        });
+        Assert.Equal(1, persisted.Cantidad);
+        Assert.Equal("Enviado", persisted.Estado);
+
+        // El mismo flujo con un estado inválido viaja por UpdateStatusAsync.
+        var invalidStatus = await auth.Client.PutAsJsonAsync($"/api/orders/{orderId}", new
+        {
+            id = orderId,
+            clientId,
+            sellerId,
+            productId,
+            productName = "Producto Contrato",
+            cantidad = 1,
+            precioUnitario = 10.50m,
+            estado = "Inexistente"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, invalidStatus.StatusCode);
+        using var doc = await ReadJsonAsync(invalidStatus);
+        Assert.Equal("Estado no válido", GetProperty(doc.RootElement, "message").GetString());
+    }
+
     private static async Task<(int ClientId, int SellerId, int ProductId)> SeedCatalogAsync(
         TestAuthClient auth, int productStock = 5)
     {
@@ -191,7 +318,8 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     private static Task<HttpResponseMessage> PostOrderAsync(
-        HttpClient client, int clientId, int? sellerId, int? productId, int cantidad = 1) =>
+        HttpClient client, int clientId, int? sellerId, int? productId,
+        int cantidad = 1, string? orderNumber = null) =>
         client.PostAsJsonAsync("/api/orders", new
         {
             clientId,
@@ -199,13 +327,15 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
             productId,
             productName = "Producto Contrato",
             cantidad,
-            precioUnitario = 10.50m
+            precioUnitario = 10.50m,
+            orderNumber
         });
 
     private static async Task<int> CreatePendingOrderIdAsync(
-        TestAuthClient auth, int clientId, int? sellerId, int? productId)
+        TestAuthClient auth, int clientId, int? sellerId, int? productId,
+        int cantidad = 1, string? orderNumber = null)
     {
-        var response = await PostOrderAsync(auth.Client, clientId, sellerId, productId);
+        var response = await PostOrderAsync(auth.Client, clientId, sellerId, productId, cantidad, orderNumber);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var doc = await ReadJsonAsync(response);
         return GetProperty(doc.RootElement, "id").GetInt32();
