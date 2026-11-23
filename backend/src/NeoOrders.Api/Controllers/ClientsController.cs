@@ -31,8 +31,15 @@ public class ClientsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] ClientDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var created = await _clients.CreateAsync(dto);
-        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+        try
+        {
+            var created = await _clients.CreateAsync(dto);
+            return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{id:int}")]
@@ -41,9 +48,16 @@ public class ClientsController : ControllerBase
     {
         if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var ok = await _clients.UpdateAsync(id, dto);
-        if (!ok) return NotFound(new { message = "Cliente no encontrado." });
-        return NoContent();
+        try
+        {
+            var ok = await _clients.UpdateAsync(id, dto);
+            if (!ok) return NotFound(new { message = "Cliente no encontrado." });
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id:int}")]

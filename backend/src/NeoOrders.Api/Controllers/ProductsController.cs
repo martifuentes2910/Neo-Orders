@@ -36,8 +36,15 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] ProductDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var created = await _products.CreateAsync(dto);
-        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+        try
+        {
+            var created = await _products.CreateAsync(dto);
+            return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{id:int}")]
@@ -46,9 +53,16 @@ public class ProductsController : ControllerBase
     {
         if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var ok = await _products.UpdateAsync(id, dto);
-        if (!ok) return NotFound(new { message = "Producto no encontrado." });
-        return NoContent();
+        try
+        {
+            var ok = await _products.UpdateAsync(id, dto);
+            if (!ok) return NotFound(new { message = "Producto no encontrado." });
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id:int}")]

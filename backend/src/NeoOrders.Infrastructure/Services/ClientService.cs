@@ -11,6 +11,10 @@ public class ClientService : IClientService
     private readonly AppDbContext _db;
     public ClientService(AppDbContext db) => _db = db;
 
+    private static bool IsUniqueConstraint(DbUpdateException ex)
+        => ex.InnerException?.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) == true
+           || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true;
+
     public async Task<List<ClientListItemDto>> ListAsync(string? search)
     {
         var q = _db.Clients.AsNoTracking().AsQueryable();
@@ -41,11 +45,20 @@ public class ClientService : IClientService
 
     public async Task<ClientDto> CreateAsync(ClientDto dto)
     {
-        var entity = new Client { Nombre = dto.Nombre, Email = dto.Email, Telefono = dto.Telefono, Direccion = dto.Direccion };
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+        var entity = new Client { Nombre = dto.Nombre, Email = normalizedEmail, Telefono = dto.Telefono, Direccion = dto.Direccion };
         _db.Clients.Add(entity);
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraint(ex))
+        {
+            throw new InvalidOperationException("Ya existe un cliente con ese email.");
+        }
         dto.Id = entity.Id;
         dto.FechaAlta = entity.FechaAlta;
+        dto.Email = normalizedEmail;
         return dto;
     }
 
@@ -54,10 +67,17 @@ public class ClientService : IClientService
         var existing = await _db.Clients.FindAsync(id);
         if (existing == null) return false;
         existing.Nombre = dto.Nombre;
-        existing.Email = dto.Email;
+        existing.Email = dto.Email.Trim().ToLowerInvariant();
         existing.Telefono = dto.Telefono;
         existing.Direccion = dto.Direccion;
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraint(ex))
+        {
+            throw new InvalidOperationException("Ya existe un cliente con ese email.");
+        }
         return true;
     }
 
