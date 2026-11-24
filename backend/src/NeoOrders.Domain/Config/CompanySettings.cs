@@ -1,9 +1,11 @@
 namespace NeoOrders.Domain.Config;
 
-// KAN-38: definición persistible de la configuración de la empresa.
+// KAN-38: definición persistible de la configuración de la empresa. Sólo propiedades;
+// el comportamiento vive en CompanySettings.Behavior.cs. Sin dependencias de EF/AspNet/Identity/DataAnnotations.
 // El esquema se configura en Infrastructure/Data/Configurations/CompanySettingsConfiguration.
-// Los setters son privados: el alta usa Create/Rehydrate y la edición UpdateDetails.
-public class CompanySettings
+// Los setters son privados: la creación/reconstrucción se hace con las factories
+// Create/Rehydrate y las mutaciones con los métodos del dominio.
+public partial class CompanySettings
 {
     public int Id { get; private set; }
     public string NombreEmpresa { get; private set; } = "NeoOrders";
@@ -12,31 +14,4 @@ public class CompanySettings
 
     // Constructor para la materialización de EF; el resto del código usa las factories.
     private CompanySettings() { }
-
-    public static CompanySettings Create(
-        string nombreEmpresa = "NeoOrders",
-        string moneda = "ARS",
-        decimal tipoDeCambio = 1m) => Build(0, nombreEmpresa, moneda, tipoDeCambio);
-
-    // Reconstrucción desde persistencia/fixtures: no revalida para no rechazar filas legacy.
-    public static CompanySettings Rehydrate(
-        int id,
-        string nombreEmpresa = "NeoOrders",
-        string moneda = "ARS",
-        decimal tipoDeCambio = 1m) => Build(id, nombreEmpresa, moneda, tipoDeCambio);
-
-    public void UpdateDetails(string nombreEmpresa, string moneda, decimal tipoDeCambio)
-    {
-        NombreEmpresa = nombreEmpresa;
-        Moneda = moneda;
-        TipoDeCambio = tipoDeCambio;
-    }
-
-    private static CompanySettings Build(int id, string nombreEmpresa, string moneda, decimal tipoDeCambio) => new()
-    {
-        Id = id,
-        NombreEmpresa = nombreEmpresa,
-        Moneda = moneda,
-        TipoDeCambio = tipoDeCambio
-    };
 }
