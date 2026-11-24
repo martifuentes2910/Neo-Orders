@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { CsvImportResult } from '../api';
+import type { CsvImportResult } from '../types';
 
 interface Props {
   open: boolean;
@@ -131,3 +131,4 @@ export default function CsvImportDialog({ open, onOpenChange, title, templateUrl
     </Dialog>
   );
 }
+
