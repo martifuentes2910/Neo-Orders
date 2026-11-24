@@ -12,6 +12,7 @@ namespace NeoOrders.Api.Tests;
 /// </summary>
 public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
 {
+    private const string MensajeArchivoRequerido = "Debe seleccionar un archivo CSV.";
     private const string MensajeExtensionInvalida = "El archivo debe tener extensión .csv.";
 
     private readonly NeoOrdersApiFactory _factory;
@@ -34,19 +35,18 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.StartsWith("Sku;Name;Category;BasePrice;Cost;Stock;MinStockAlert;Active", body, StringComparison.Ordinal);
     }
 
-    // Los controllers declaran `if (file == null) return BadRequest(new { message = ... })`,
-    // pero con Nullable enable + [ApiController] el parámetro IFormFile no anulable
-    // recibe un [Required] implícito: el filtro de ModelState devuelve 400 antes de
-    // entrar a la acción. El contrato observable es ValidationProblemDetails.
+    // Contrato file-required: el parámetro IFormFile? evita el [Required] implícito
+    // de [ApiController], de modo que se ejecuta el guard de la acción y la respuesta
+    // es 400 { message }, el mismo shape que el resto de errores de importación.
     [Fact]
-    public async Task PostProductsImportCsv_SinArchivo_Retorna400ConErrorDeValidacion()
+    public async Task PostProductsImportCsv_SinArchivo_Retorna400ConMessage()
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
         using var form = CreateFormWithoutFile();
 
         var response = await auth.Client.PostAsync("/api/products/import-csv", form);
 
-        await AssertBadRequestFileRequiredAsync(response);
+        await AssertBadRequestMessageAsync(response, MensajeArchivoRequerido);
     }
 
     [Fact]
@@ -61,14 +61,14 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
-    public async Task PostClientsImportCsv_SinArchivo_Retorna400ConErrorDeValidacion()
+    public async Task PostClientsImportCsv_SinArchivo_Retorna400ConMessage()
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
         using var form = CreateFormWithoutFile();
 
         var response = await auth.Client.PostAsync("/api/clients/import-csv", form);
 
-        await AssertBadRequestFileRequiredAsync(response);
+        await AssertBadRequestMessageAsync(response, MensajeArchivoRequerido);
     }
 
     [Fact]
@@ -83,14 +83,14 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
-    public async Task PostOrdersImportCsv_SinArchivo_Retorna400ConErrorDeValidacion()
+    public async Task PostOrdersImportCsv_SinArchivo_Retorna400ConMessage()
     {
         using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
         using var form = CreateFormWithoutFile();
 
         var response = await auth.Client.PostAsync("/api/orders/import-csv", form);
 
-        await AssertBadRequestFileRequiredAsync(response);
+        await AssertBadRequestMessageAsync(response, MensajeArchivoRequerido);
     }
 
     [Fact]
@@ -498,18 +498,6 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.True(doc.RootElement.TryGetProperty("message", out var message),
             $"La respuesta 400 no contiene 'message': {doc.RootElement.GetRawText()}");
         Assert.Equal(expectedMessage, message.GetString());
-    }
-
-    private static async Task AssertBadRequestFileRequiredAsync(HttpResponseMessage response)
-    {
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        Assert.True(doc.RootElement.TryGetProperty("errors", out var errors),
-            $"La respuesta 400 no contiene 'errors': {doc.RootElement.GetRawText()}");
-        Assert.True(errors.TryGetProperty("file", out var fileErrors),
-            $"Los errores no contienen 'file': {errors.GetRawText()}");
-        Assert.Contains(fileErrors.EnumerateArray(), e =>
-            e.GetString()?.Contains("file", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>

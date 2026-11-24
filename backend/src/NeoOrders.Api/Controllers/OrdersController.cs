@@ -97,7 +97,7 @@ public class OrdersController : ControllerBase
 
     [HttpPost("import-csv")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> ImportCsv([FromForm] IFormFile file, CancellationToken ct)
+    public async Task<IActionResult> ImportCsv([FromForm] IFormFile? file, CancellationToken ct)
     {
         if (file == null) return BadRequest(new { message = "Debe seleccionar un archivo CSV." });
         var ext = Path.GetExtension(file.FileName);
