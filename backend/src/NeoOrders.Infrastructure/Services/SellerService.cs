@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Application.Contracts.Sellers;
 using NeoOrders.Application.DTOs.Sellers;
+using NeoOrders.Domain.Sellers;
 using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Infrastructure.Services;
 
@@ -33,7 +33,7 @@ public class SellerService : ISellerService
     public async Task<SellerDto> CreateAsync(SellerDto dto)
     {
         var email = dto.Email.Trim().ToLowerInvariant();
-        var entity = new Seller { Name = dto.Name, Email = email, Phone = dto.Phone, CommissionPercentage = dto.CommissionPercentage, Active = dto.Active };
+        var entity = Seller.Create(dto.Name, email, dto.Phone, dto.CommissionPercentage, dto.Active);
         _db.Sellers.Add(entity);
         try
         {
@@ -52,8 +52,7 @@ public class SellerService : ISellerService
     {
         var existing = await _db.Sellers.FindAsync(id);
         if (existing == null) return false;
-        existing.Name = dto.Name; existing.Email = dto.Email.Trim().ToLowerInvariant(); existing.Phone = dto.Phone;
-        existing.CommissionPercentage = dto.CommissionPercentage; existing.Active = dto.Active;
+        existing.UpdateDetails(dto.Name, dto.Email.Trim().ToLowerInvariant(), dto.Phone, dto.CommissionPercentage, dto.Active);
         try
         {
             await _db.SaveChangesAsync();

@@ -12,6 +12,14 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <Using Include="NeoOrders.Domain.Clients" />
+    <Using Include="NeoOrders.Domain.Config" />
+    <Using Include="NeoOrders.Domain.Notifications" />
+    <Using Include="NeoOrders.Domain.Orders" />
+    <Using Include="NeoOrders.Domain.Products" />
+    <Using Include="NeoOrders.Domain.Sellers" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="CloudinaryDotNet" Version="1.29.3" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.1" />

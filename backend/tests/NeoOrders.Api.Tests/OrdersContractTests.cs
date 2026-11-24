@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 
@@ -518,11 +517,7 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return auth.QueryDbAsync(async db =>
         {
-            var client = new Client
-            {
-                Nombre = $"Cliente Contrato {suffix}",
-                Email = $"orders.contract.client.{suffix}@test.local"
-            };
+            var client = Client.Create($"Cliente Contrato {suffix}", $"orders.contract.client.{suffix}@test.local");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -534,12 +529,7 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return auth.QueryDbAsync(async db =>
         {
-            var seller = new Seller
-            {
-                Name = $"Vendedor Contrato {suffix}",
-                Email = $"orders.contract.seller.{suffix}@test.local",
-                Active = true
-            };
+            var seller = Seller.Create($"Vendedor Contrato {suffix}", $"orders.contract.seller.{suffix}@test.local");
             db.Sellers.Add(seller);
             await db.SaveChangesAsync();
             return seller.Id;
@@ -551,17 +541,14 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return auth.QueryDbAsync(async db =>
         {
-            var product = new Product
-            {
-                Sku = $"SKU-ORDERS-CONTRACT-{suffix}",
-                Name = $"Producto Contrato {suffix}",
-                Category = "General",
-                BasePrice = 10.50m,
-                Cost = 5.25m,
-                Stock = stock,
-                MinStockAlert = 1,
-                Active = true
-            };
+            var product = Product.Create(
+                $"SKU-ORDERS-CONTRACT-{suffix}",
+                $"Producto Contrato {suffix}",
+                "General",
+                10.50m,
+                5.25m,
+                stock,
+                1);
             db.Products.Add(product);
             await db.SaveChangesAsync();
             return product.Id;

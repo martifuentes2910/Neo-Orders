@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 
@@ -196,55 +195,46 @@ public class NotificationsReportsContractTests : IClassFixture<NeoOrdersApiFacto
         {
             var now = DateTime.UtcNow;
             db.Notifications.AddRange(
-                new Notification
-                {
-                    Tipo = "pedido",
-                    Accion = "creado",
-                    Titulo = $"Pedido {suffix}",
-                    Mensaje = "Alta de pedido",
-                    Usuario = "Sistema",
-                    EntidadId = 1,
-                    Fecha = now
-                },
-                new Notification
-                {
-                    Tipo = "cliente",
-                    Accion = "creado",
-                    Titulo = $"Cliente {suffix}",
-                    Mensaje = "Alta de cliente",
-                    Fecha = now
-                });
+                Notification.Create(
+                    tipo: "pedido",
+                    accion: "creado",
+                    titulo: $"Pedido {suffix}",
+                    mensaje: "Alta de pedido",
+                    usuario: "Sistema",
+                    entidadId: 1,
+                    fecha: now),
+                Notification.Create(
+                    tipo: "cliente",
+                    accion: "creado",
+                    titulo: $"Cliente {suffix}",
+                    mensaje: "Alta de cliente",
+                    fecha: now));
 
-            db.Products.Add(new Product
-            {
-                Sku = $"SKU-NOTIF-{suffix}",
-                Name = $"Producto stock crítico {suffix}",
-                Category = "General",
-                BasePrice = 10.50m,
-                Cost = 5.25m,
-                Stock = 1,
-                MinStockAlert = 2,
-                Active = true
-            });
+            db.Products.Add(Product.Create(
+                $"SKU-NOTIF-{suffix}",
+                $"Producto stock crítico {suffix}",
+                "General",
+                10.50m,
+                5.25m,
+                1,
+                2));
 
-            var client = new Client
-            {
-                Nombre = $"Cliente notificación {suffix}",
-                Email = $"notif.client.{suffix}@test.local"
-            };
+            var client = Client.Create($"Cliente notificación {suffix}", $"notif.client.{suffix}@test.local");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
 
-            db.Orders.Add(new Order
-            {
-                ClientId = client.Id,
-                ProductName = $"Pedido pendiente {suffix}",
-                Cantidad = 1,
-                PrecioUnitario = 10.50m,
-                Total = 10.50m,
-                Estado = "Pendiente",
-                Fecha = now
-            });
+            db.Orders.Add(Order.Rehydrate(
+                id: 0,
+                clientId: client.Id,
+                sellerId: null,
+                productId: null,
+                productName: $"Pedido pendiente {suffix}",
+                cantidad: 1,
+                precioUnitario: 10.50m,
+                total: 10.50m,
+                fecha: now,
+                estado: "Pendiente",
+                orderNumber: null));
             await db.SaveChangesAsync();
             return null;
         });
@@ -257,46 +247,33 @@ public class NotificationsReportsContractTests : IClassFixture<NeoOrdersApiFacto
         var productName = $"Producto dashboard {suffix}";
         return await auth.QueryDbAsync(async db =>
         {
-            var client = new Client
-            {
-                Nombre = clientName,
-                Email = $"dashboard.client.{suffix}@test.local"
-            };
-            var seller = new Seller
-            {
-                Name = $"Vendedor dashboard {suffix}",
-                Email = $"dashboard.seller.{suffix}@test.local",
-                Active = true
-            };
-            var product = new Product
-            {
-                Sku = $"SKU-DASH-{suffix}",
-                Name = productName,
-                Category = "General",
-                BasePrice = 10.50m,
-                Cost = 5.25m,
-                Stock = 5,
-                MinStockAlert = 1,
-                Active = true
-            };
+            var client = Client.Create(clientName, $"dashboard.client.{suffix}@test.local");
+            var seller = Seller.Create($"Vendedor dashboard {suffix}", $"dashboard.seller.{suffix}@test.local");
+            var product = Product.Create(
+                $"SKU-DASH-{suffix}",
+                productName,
+                "General",
+                10.50m,
+                5.25m,
+                5,
+                1);
             db.Clients.Add(client);
             db.Sellers.Add(seller);
             db.Products.Add(product);
             await db.SaveChangesAsync();
 
-            var order = new Order
-            {
-                OrderNumber = $"DASH-{suffix}"[..20],
-                ClientId = client.Id,
-                SellerId = seller.Id,
-                ProductId = product.Id,
-                ProductName = productName,
-                Cantidad = 1,
-                PrecioUnitario = 10.50m,
-                Total = 10.50m,
-                Estado = "Pendiente",
-                Fecha = DateTime.UtcNow
-            };
+            var order = Order.Rehydrate(
+                id: 0,
+                clientId: client.Id,
+                sellerId: seller.Id,
+                productId: product.Id,
+                productName: productName,
+                cantidad: 1,
+                precioUnitario: 10.50m,
+                total: 10.50m,
+                fecha: DateTime.UtcNow,
+                estado: "Pendiente",
+                orderNumber: $"DASH-{suffix}"[..20]);
             db.Orders.Add(order);
             await db.SaveChangesAsync();
             return (order.Id, clientName, productName);

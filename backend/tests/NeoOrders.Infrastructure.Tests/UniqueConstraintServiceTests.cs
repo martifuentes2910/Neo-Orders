@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
 using NeoOrders.Infrastructure.Services;
 
 namespace NeoOrders.Infrastructure.Tests;

@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Application.Contracts.Reportes;
 using NeoOrders.Application.DTOs.Reportes;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Infrastructure.Data.Repositories.Reportes;
 

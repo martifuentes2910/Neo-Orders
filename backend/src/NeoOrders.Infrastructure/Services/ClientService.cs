@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Application.Contracts.Clients;
 using NeoOrders.Application.DTOs.Clients;
+using NeoOrders.Domain.Clients;
 using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Infrastructure.Services;
 
@@ -46,7 +46,7 @@ public class ClientService : IClientService
     public async Task<ClientDto> CreateAsync(ClientDto dto)
     {
         var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
-        var entity = new Client { Nombre = dto.Nombre, Email = normalizedEmail, Telefono = dto.Telefono, Direccion = dto.Direccion };
+        var entity = Client.Create(dto.Nombre, normalizedEmail, dto.Telefono, dto.Direccion);
         _db.Clients.Add(entity);
         try
         {
@@ -66,10 +66,7 @@ public class ClientService : IClientService
     {
         var existing = await _db.Clients.FindAsync(id);
         if (existing == null) return false;
-        existing.Nombre = dto.Nombre;
-        existing.Email = dto.Email.Trim().ToLowerInvariant();
-        existing.Telefono = dto.Telefono;
-        existing.Direccion = dto.Direccion;
+        existing.UpdateDetails(dto.Nombre, dto.Email.Trim().ToLowerInvariant(), dto.Telefono, dto.Direccion);
         try
         {
             await _db.SaveChangesAsync();

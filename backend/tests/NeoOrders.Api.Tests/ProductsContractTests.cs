@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NeoOrders.Application.Contracts.Productos;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 
@@ -137,8 +136,9 @@ public class ProductsContractTests : IClassFixture<NeoOrdersApiFactory>
         await auth.QueryDbAsync(async db =>
         {
             var product = (await db.Products.FindAsync(productId))!;
-            product.ImageUrl = "https://res.cloudinary.com/test/image/upload/sample.png";
-            product.ImagePublicId = "neoorders/products/sample";
+            product.SetImage(
+                "https://res.cloudinary.com/test/image/upload/sample.png",
+                "neoorders/products/sample");
             await db.SaveChangesAsync();
             return true;
         });
@@ -267,17 +267,14 @@ public class ProductsContractTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return await auth.QueryDbAsync(async db =>
         {
-            var product = new Product
-            {
-                Sku = $"SKU-PRODUCT-IMG-{suffix}",
-                Name = $"Producto imagen {suffix}",
-                Category = "General",
-                BasePrice = 10.50m,
-                Cost = 5.25m,
-                Stock = 5,
-                MinStockAlert = 1,
-                Active = true
-            };
+            var product = Product.Create(
+                $"SKU-PRODUCT-IMG-{suffix}",
+                $"Producto imagen {suffix}",
+                "General",
+                10.50m,
+                5.25m,
+                5,
+                1);
             db.Products.Add(product);
             await db.SaveChangesAsync();
             return product.Id;

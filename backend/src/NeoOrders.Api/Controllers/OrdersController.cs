@@ -49,7 +49,7 @@ public class OrdersController : ControllerBase
         if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var current = await _orderQuery.GetEstadoAsync(id);
-        if (current != null && OrderStatuses.EditLocked.Contains(current))
+        if (current != null && OrderStatusPolicy.EditLocked.Contains(current))
         {
             var statusResult = await _orderService.UpdateStatusAsync(id, dto.Estado);
             if (statusResult.NotFound) return NotFound(new { message = statusResult.Error });
@@ -82,7 +82,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("statuses")]
-    public IActionResult Statuses() => Ok(OrderStatuses.All);
+    public IActionResult Statuses() => Ok(OrderStatusPolicy.All);
 
     [HttpGet("import-csv/template")]
     [Authorize(Roles = "Admin")]

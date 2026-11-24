@@ -99,14 +99,7 @@ public class ClientsSellersConfigContractTests : IClassFixture<NeoOrdersApiFacto
 
         var sellerId = await auth.QueryDbAsync(async db =>
         {
-            var seller = new Seller
-            {
-                Name = name,
-                Email = email,
-                Phone = "987654321",
-                CommissionPercentage = 7.5m,
-                Active = true
-            };
+            var seller = Seller.Create(name, email, "987654321", 7.5m);
             db.Sellers.Add(seller);
             await db.SaveChangesAsync();
             return seller.Id;
@@ -278,13 +271,11 @@ public class ClientsSellersConfigContractTests : IClassFixture<NeoOrdersApiFacto
         var suffix = Guid.NewGuid().ToString("N");
         return auth.QueryDbAsync(async db =>
         {
-            var client = new Client
-            {
-                Nombre = $"Cliente contrato {suffix}",
-                Email = $"cliente.contrato.{suffix}@test.local",
-                Telefono = "123456789",
-                Direccion = "Calle Contrato 1"
-            };
+            var client = Client.Create(
+                $"Cliente contrato {suffix}",
+                $"cliente.contrato.{suffix}@test.local",
+                "123456789",
+                "Calle Contrato 1");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -296,14 +287,7 @@ public class ClientsSellersConfigContractTests : IClassFixture<NeoOrdersApiFacto
         var suffix = Guid.NewGuid().ToString("N");
         return auth.QueryDbAsync(async db =>
         {
-            var seller = new Seller
-            {
-                Name = $"Vendedor contrato {suffix}",
-                Email = $"vendedor.contrato.{suffix}@test.local",
-                Phone = "987654321",
-                CommissionPercentage = 5m,
-                Active = true
-            };
+            var seller = Seller.Create($"Vendedor contrato {suffix}", $"vendedor.contrato.{suffix}@test.local", "987654321", 5m);
             db.Sellers.Add(seller);
             await db.SaveChangesAsync();
             return seller.Id;

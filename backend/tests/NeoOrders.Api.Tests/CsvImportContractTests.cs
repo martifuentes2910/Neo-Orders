@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 
@@ -555,18 +554,18 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         TestAuthClient auth, int clientId, int sellerId, int productId, string orderNumber) =>
         await auth.QueryDbAsync(async db =>
         {
-            var order = new Order
-            {
-                OrderNumber = orderNumber,
-                ClientId = clientId,
-                SellerId = sellerId,
-                ProductId = productId,
-                ProductName = "Pedido existente CSV",
-                Cantidad = 1,
-                PrecioUnitario = 10.50m,
-                Total = 10.50m,
-                Estado = "Pendiente"
-            };
+            var order = Order.Rehydrate(
+                id: 0,
+                clientId: clientId,
+                sellerId: sellerId,
+                productId: productId,
+                productName: "Pedido existente CSV",
+                cantidad: 1,
+                precioUnitario: 10.50m,
+                total: 10.50m,
+                fecha: DateTime.UtcNow,
+                estado: "Pendiente",
+                orderNumber: orderNumber);
             db.Orders.Add(order);
             await db.SaveChangesAsync();
             return order.Id;
@@ -578,28 +577,17 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return await auth.QueryDbAsync(async db =>
         {
-            var client = new Client
-            {
-                Nombre = $"Cliente CSV {suffix}",
-                Email = $"csv.contract.client.{suffix}@test.local"
-            };
-            var seller = new Seller
-            {
-                Name = $"Vendedor CSV {suffix}",
-                Email = $"csv.contract.seller.{suffix}@test.local",
-                Active = sellerActive
-            };
-            var product = new Product
-            {
-                Sku = $"SKU-CSV-{suffix}",
-                Name = $"Producto CSV {suffix}",
-                Category = "General",
-                BasePrice = 10.50m,
-                Cost = 5.25m,
-                Stock = 5,
-                MinStockAlert = 1,
-                Active = productActive
-            };
+            var client = Client.Create($"Cliente CSV {suffix}", $"csv.contract.client.{suffix}@test.local");
+            var seller = Seller.Create($"Vendedor CSV {suffix}", $"csv.contract.seller.{suffix}@test.local", active: sellerActive);
+            var product = Product.Create(
+                $"SKU-CSV-{suffix}",
+                $"Producto CSV {suffix}",
+                "General",
+                10.50m,
+                5.25m,
+                5,
+                1,
+                productActive);
             db.Clients.Add(client);
             db.Sellers.Add(seller);
             db.Products.Add(product);

@@ -2,7 +2,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NeoOrders.Infrastructure.Models;
+using NeoOrders.Domain.Clients;
+using NeoOrders.Domain.Config;
 using NeoOrders.Domain.Orders;
+using NeoOrders.Domain.Products;
+using NeoOrders.Domain.Sellers;
 
 namespace NeoOrders.Infrastructure.Data;
 
@@ -25,12 +29,7 @@ public static class DbSeeder
 
         if (!await db.CompanySettings.AnyAsync())
         {
-            db.CompanySettings.Add(new CompanySettings
-            {
-                NombreEmpresa = "NeoOrders S.A.",
-                Moneda = "ARS",
-                TipoDeCambio = 1m
-            });
+            db.CompanySettings.Add(CompanySettings.Create("NeoOrders S.A.", "ARS", 1m));
             await db.SaveChangesAsync();
         }
 
@@ -38,49 +37,49 @@ public static class DbSeeder
         {
             var clients = new List<Client>
             {
-                new() { Nombre = "Juan Pérez", Email = "juan.perez@mail.com", Telefono = "+54 11 4000-1001", Direccion = "Av. Corrientes 1234, CABA", FechaAlta = DateTime.UtcNow.AddMonths(-6) },
-                new() { Nombre = "María López", Email = "maria.lopez@mail.com", Telefono = "+54 11 4000-1002", Direccion = "Calle Falsa 123, La Plata", FechaAlta = DateTime.UtcNow.AddMonths(-5) },
-                new() { Nombre = "Carlos García", Email = "carlos.garcia@mail.com", Telefono = "+54 351 4000-1003", Direccion = "Bv. San Juan 456, Córdoba", FechaAlta = DateTime.UtcNow.AddMonths(-4) },
-                new() { Nombre = "Lucía Fernández", Email = "lucia.fernandez@mail.com", Telefono = "+54 261 4000-1004", Direccion = "San Martín 789, Mendoza", FechaAlta = DateTime.UtcNow.AddMonths(-4) },
-                new() { Nombre = "Martín Rodríguez", Email = "martin.rodriguez@mail.com", Telefono = "+54 381 4000-1005", Direccion = "25 de Mayo 321, Tucumán", FechaAlta = DateTime.UtcNow.AddMonths(-3) },
-                new() { Nombre = "Sofía Martínez", Email = "sofia.martinez@mail.com", Telefono = "+54 223 4000-1006", Direccion = "Av. Colón 654, Mar del Plata", FechaAlta = DateTime.UtcNow.AddMonths(-3) },
-                new() { Nombre = "Diego Sánchez", Email = "diego.sanchez@mail.com", Telefono = "+54 342 4000-1007", Direccion = "San Lorenzo 987, Santa Fe", FechaAlta = DateTime.UtcNow.AddMonths(-2) },
-                new() { Nombre = "Valentina Torres", Email = "valentina.torres@mail.com", Telefono = "+54 299 4000-1008", Direccion = "Roca 147, Neuquén", FechaAlta = DateTime.UtcNow.AddMonths(-2) },
-                new() { Nombre = "Andrés Ramírez", Email = "andres.ramirez@mail.com", Telefono = "+54 2966 4000-1009", Direccion = "San Martín 258, Ushuaia", FechaAlta = DateTime.UtcNow.AddMonths(-1) },
-                new() { Nombre = "Camila Díaz", Email = "camila.diaz@mail.com", Telefono = "+54 379 4000-1010", Direccion = "Junín 369, Corrientes", FechaAlta = DateTime.UtcNow.AddMonths(-1) },
+                Client.Create("Juan Pérez", "juan.perez@mail.com", "+54 11 4000-1001", "Av. Corrientes 1234, CABA", DateTime.UtcNow.AddMonths(-6)),
+                Client.Create("María López", "maria.lopez@mail.com", "+54 11 4000-1002", "Calle Falsa 123, La Plata", DateTime.UtcNow.AddMonths(-5)),
+                Client.Create("Carlos García", "carlos.garcia@mail.com", "+54 351 4000-1003", "Bv. San Juan 456, Córdoba", DateTime.UtcNow.AddMonths(-4)),
+                Client.Create("Lucía Fernández", "lucia.fernandez@mail.com", "+54 261 4000-1004", "San Martín 789, Mendoza", DateTime.UtcNow.AddMonths(-4)),
+                Client.Create("Martín Rodríguez", "martin.rodriguez@mail.com", "+54 381 4000-1005", "25 de Mayo 321, Tucumán", DateTime.UtcNow.AddMonths(-3)),
+                Client.Create("Sofía Martínez", "sofia.martinez@mail.com", "+54 223 4000-1006", "Av. Colón 654, Mar del Plata", DateTime.UtcNow.AddMonths(-3)),
+                Client.Create("Diego Sánchez", "diego.sanchez@mail.com", "+54 342 4000-1007", "San Lorenzo 987, Santa Fe", DateTime.UtcNow.AddMonths(-2)),
+                Client.Create("Valentina Torres", "valentina.torres@mail.com", "+54 299 4000-1008", "Roca 147, Neuquén", DateTime.UtcNow.AddMonths(-2)),
+                Client.Create("Andrés Ramírez", "andres.ramirez@mail.com", "+54 2966 4000-1009", "San Martín 258, Ushuaia", DateTime.UtcNow.AddMonths(-1)),
+                Client.Create("Camila Díaz", "camila.diaz@mail.com", "+54 379 4000-1010", "Junín 369, Corrientes", DateTime.UtcNow.AddMonths(-1)),
             };
             db.Clients.AddRange(clients);
             await db.SaveChangesAsync();
 
             var sellers = new List<Seller>
             {
-                new() { Name = "Ana Gómez", Email = "ana.gomez@neoorders.com", Phone = "+54 11 5000-2001", CommissionPercentage = 5.0m, Active = true },
-                new() { Name = "Bruno Díaz", Email = "bruno.diaz@neoorders.com", Phone = "+54 11 5000-2002", CommissionPercentage = 6.5m, Active = true },
-                new() { Name = "Carla Ruiz", Email = "carla.ruiz@neoorders.com", Phone = "+54 11 5000-2003", CommissionPercentage = 4.0m, Active = true },
-                new() { Name = "Diego Fernández", Email = "diego.fernandez@neoorders.com", Phone = "+54 11 5000-2004", CommissionPercentage = 7.0m, Active = true },
-                new() { Name = "Elena Torres", Email = "elena.torres@neoorders.com", Phone = "+54 11 5000-2005", CommissionPercentage = 5.5m, Active = true },
+                Seller.Create("Ana Gómez", "ana.gomez@neoorders.com", "+54 11 5000-2001", 5.0m),
+                Seller.Create("Bruno Díaz", "bruno.diaz@neoorders.com", "+54 11 5000-2002", 6.5m),
+                Seller.Create("Carla Ruiz", "carla.ruiz@neoorders.com", "+54 11 5000-2003", 4.0m),
+                Seller.Create("Diego Fernández", "diego.fernandez@neoorders.com", "+54 11 5000-2004", 7.0m),
+                Seller.Create("Elena Torres", "elena.torres@neoorders.com", "+54 11 5000-2005", 5.5m),
             };
             db.Sellers.AddRange(sellers);
             await db.SaveChangesAsync();
 
             var products = new List<Product>
             {
-                new() { Sku = "NB-PRO-15", Name = "Notebook Pro 15", Category = "Equipos", BasePrice = 450000m, Cost = 360000m, Stock = 12, MinStockAlert = 5 },
-                new() { Sku = "MOU-WL-01", Name = "Mouse inalámbrico", Category = "Periféricos", BasePrice = 12000m, Cost = 8000m, Stock = 45, MinStockAlert = 10 },
-                new() { Sku = "KEY-MEC-01", Name = "Teclado mecánico", Category = "Periféricos", BasePrice = 35000m, Cost = 25000m, Stock = 18, MinStockAlert = 5 },
-                new() { Sku = "MON-27-01", Name = "Monitor 27\"", Category = "Equipos", BasePrice = 180000m, Cost = 140000m, Stock = 9, MinStockAlert = 3 },
-                new() { Sku = "AUD-BT-01", Name = "Auriculares Bluetooth", Category = "Audio", BasePrice = 28000m, Cost = 20000m, Stock = 25, MinStockAlert = 8 },
-                new() { Sku = "WEB-HD-01", Name = "Webcam HD", Category = "Periféricos", BasePrice = 22000m, Cost = 15000m, Stock = 14, MinStockAlert = 5 },
-                new() { Sku = "SSD-1TB-01", Name = "Disco SSD 1TB", Category = "Almacenamiento", BasePrice = 55000m, Cost = 40000m, Stock = 30, MinStockAlert = 10 },
-                new() { Sku = "RAM-16GB-01", Name = "Memoria RAM 16GB", Category = "Componentes", BasePrice = 48000m, Cost = 35000m, Stock = 22, MinStockAlert = 6 },
-                new() { Sku = "SIL-ERG-01", Name = "Silla ergonómica", Category = "Mobiliario", BasePrice = 95000m, Cost = 70000m, Stock = 7, MinStockAlert = 3 },
-                new() { Sku = "ESC-AJU-01", Name = "Escritorio ajustable", Category = "Mobiliario", BasePrice = 120000m, Cost = 90000m, Stock = 4, MinStockAlert = 2 },
+                Product.Create("NB-PRO-15", "Notebook Pro 15", "Equipos", 450000m, 360000m, 12, 5),
+                Product.Create("MOU-WL-01", "Mouse inalámbrico", "Periféricos", 12000m, 8000m, 45, 10),
+                Product.Create("KEY-MEC-01", "Teclado mecánico", "Periféricos", 35000m, 25000m, 18, 5),
+                Product.Create("MON-27-01", "Monitor 27\"", "Equipos", 180000m, 140000m, 9, 3),
+                Product.Create("AUD-BT-01", "Auriculares Bluetooth", "Audio", 28000m, 20000m, 25, 8),
+                Product.Create("WEB-HD-01", "Webcam HD", "Periféricos", 22000m, 15000m, 14, 5),
+                Product.Create("SSD-1TB-01", "Disco SSD 1TB", "Almacenamiento", 55000m, 40000m, 30, 10),
+                Product.Create("RAM-16GB-01", "Memoria RAM 16GB", "Componentes", 48000m, 35000m, 22, 6),
+                Product.Create("SIL-ERG-01", "Silla ergonómica", "Mobiliario", 95000m, 70000m, 7, 3),
+                Product.Create("ESC-AJU-01", "Escritorio ajustable", "Mobiliario", 120000m, 90000m, 4, 2),
             };
             db.Products.AddRange(products);
             await db.SaveChangesAsync();
 
             var rnd = new Random(42);
-            var estados = OrderStatuses.All;
+            var estados = OrderStatusPolicy.All;
             var pedidos = new List<Order>();
             for (int i = 0; i < 60; i++)
             {
@@ -90,20 +89,20 @@ public static class DbSeeder
                 var cantidad = rnd.Next(1, 4);
                 var fecha = DateTime.UtcNow.AddDays(-rnd.Next(0, 180));
                 var estado = estados[rnd.Next(estados.Length)];
-                if (i % 7 == 0) estado = OrderStatuses.Entregado;
-                if (i % 11 == 0) estado = OrderStatuses.Pendiente;
-                pedidos.Add(new Order
-                {
-                    ClientId = cliente.Id,
-                    SellerId = seller.Id,
-                    ProductId = product.Id,
-                    ProductName = product.Name,
-                    Cantidad = cantidad,
-                    PrecioUnitario = product.BasePrice,
-                    Total = cantidad * product.BasePrice,
-                    Fecha = fecha,
-                    Estado = estado
-                });
+                if (i % 7 == 0) estado = OrderStatusPolicy.Entregado;
+                if (i % 11 == 0) estado = OrderStatusPolicy.Pendiente;
+                pedidos.Add(Order.Rehydrate(
+                    id: 0,
+                    clientId: cliente.Id,
+                    sellerId: seller.Id,
+                    productId: product.Id,
+                    productName: product.Name,
+                    cantidad: cantidad,
+                    precioUnitario: product.BasePrice,
+                    total: cantidad * product.BasePrice,
+                    fecha: fecha,
+                    estado: estado,
+                    orderNumber: null));
             }
             db.Orders.AddRange(pedidos);
             await db.SaveChangesAsync();

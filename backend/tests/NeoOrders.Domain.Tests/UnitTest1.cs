@@ -2,22 +2,22 @@ using NeoOrders.Domain.Orders;
 
 namespace NeoOrders.Domain.Tests;
 
-public class OrderStatusesTests
+public class OrderStatusPolicyTests
 {
     [Fact]
     public void CanTransition_AllowsConfiguredTransitions()
     {
-        Assert.True(OrderStatuses.CanTransition(OrderStatuses.Pendiente, OrderStatuses.Procesado));
-        Assert.True(OrderStatuses.CanTransition(OrderStatuses.Procesado, OrderStatuses.Enviado));
-        Assert.True(OrderStatuses.CanTransition(OrderStatuses.Enviado, OrderStatuses.Entregado));
-        Assert.False(OrderStatuses.CanTransition(OrderStatuses.Pendiente, OrderStatuses.Entregado));
-        Assert.False(OrderStatuses.CanTransition(OrderStatuses.Cancelado, OrderStatuses.Procesado));
+        Assert.True(OrderStatusPolicy.CanTransition(OrderStatusPolicy.Pendiente, OrderStatusPolicy.Procesado));
+        Assert.True(OrderStatusPolicy.CanTransition(OrderStatusPolicy.Procesado, OrderStatusPolicy.Enviado));
+        Assert.True(OrderStatusPolicy.CanTransition(OrderStatusPolicy.Enviado, OrderStatusPolicy.Entregado));
+        Assert.False(OrderStatusPolicy.CanTransition(OrderStatusPolicy.Pendiente, OrderStatusPolicy.Entregado));
+        Assert.False(OrderStatusPolicy.CanTransition(OrderStatusPolicy.Cancelado, OrderStatusPolicy.Procesado));
     }
 
     [Fact]
     public void SameStatus_IsNoOp()
     {
-        Assert.True(OrderStatuses.CanTransition(OrderStatuses.Pendiente, OrderStatuses.Pendiente));
+        Assert.True(OrderStatusPolicy.CanTransition(OrderStatusPolicy.Pendiente, OrderStatusPolicy.Pendiente));
     }
 
     [Fact]
@@ -32,8 +32,8 @@ public class OrderStatusesTests
     [Fact]
     public void IsValid_RejectsUnknownStatus()
     {
-        Assert.True(OrderStatuses.IsValid("Pendiente"));
-        Assert.False(OrderStatuses.IsValid("Invalido"));
-        Assert.False(OrderStatuses.IsValid(null));
+        Assert.True(OrderStatusPolicy.IsValid("Pendiente"));
+        Assert.False(OrderStatusPolicy.IsValid("Invalido"));
+        Assert.False(OrderStatusPolicy.IsValid(null));
     }
 }
