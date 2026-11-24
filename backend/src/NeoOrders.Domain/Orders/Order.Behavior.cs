@@ -2,6 +2,10 @@ namespace NeoOrders.Domain.Orders;
 
 public sealed partial class Order
 {
+    public OrderStatus Status => OrderStatusMapper.FromExternal(Estado);
+
+    public bool IsEditLocked => OrderStatuses.EditLocked.Contains(Estado);
+
     public static Order CreateNew(
         int clientId,
         int? sellerId,

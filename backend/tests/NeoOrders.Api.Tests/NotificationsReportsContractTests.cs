@@ -234,16 +234,18 @@ public class NotificationsReportsContractTests : IClassFixture<NeoOrdersApiFacto
             db.Clients.Add(client);
             await db.SaveChangesAsync();
 
-            db.Orders.Add(new Order
-            {
-                ClientId = client.Id,
-                ProductName = $"Pedido pendiente {suffix}",
-                Cantidad = 1,
-                PrecioUnitario = 10.50m,
-                Total = 10.50m,
-                Estado = "Pendiente",
-                Fecha = now
-            });
+            db.Orders.Add(Order.Rehydrate(
+                id: 0,
+                clientId: client.Id,
+                sellerId: null,
+                productId: null,
+                productName: $"Pedido pendiente {suffix}",
+                cantidad: 1,
+                precioUnitario: 10.50m,
+                total: 10.50m,
+                fecha: now,
+                estado: "Pendiente",
+                orderNumber: null));
             await db.SaveChangesAsync();
             return null;
         });
@@ -283,19 +285,18 @@ public class NotificationsReportsContractTests : IClassFixture<NeoOrdersApiFacto
             db.Products.Add(product);
             await db.SaveChangesAsync();
 
-            var order = new Order
-            {
-                OrderNumber = $"DASH-{suffix}"[..20],
-                ClientId = client.Id,
-                SellerId = seller.Id,
-                ProductId = product.Id,
-                ProductName = productName,
-                Cantidad = 1,
-                PrecioUnitario = 10.50m,
-                Total = 10.50m,
-                Estado = "Pendiente",
-                Fecha = DateTime.UtcNow
-            };
+            var order = Order.Rehydrate(
+                id: 0,
+                clientId: client.Id,
+                sellerId: seller.Id,
+                productId: product.Id,
+                productName: productName,
+                cantidad: 1,
+                precioUnitario: 10.50m,
+                total: 10.50m,
+                fecha: DateTime.UtcNow,
+                estado: "Pendiente",
+                orderNumber: $"DASH-{suffix}"[..20]);
             db.Orders.Add(order);
             await db.SaveChangesAsync();
             return (order.Id, clientName, productName);

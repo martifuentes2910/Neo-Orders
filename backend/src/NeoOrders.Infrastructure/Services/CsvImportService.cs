@@ -313,19 +313,18 @@ public sealed class CsvImportService : ICsvImportService
         foreach (var p in parsed)
         {
             var prod = productMap[p.ProductId];
-            entities.Add(new Order
-            {
-                OrderNumber = p.OrderNumber,
-                ClientId = p.ClientId,
-                SellerId = p.SellerId,
-                ProductId = p.ProductId,
-                ProductName = prod.Name,
-                Cantidad = p.Cantidad,
-                PrecioUnitario = prod.BasePrice,
-                Total = p.Cantidad * prod.BasePrice,
-                Fecha = now,
-                Estado = OrderStatuses.Pendiente
-            });
+            entities.Add(Order.Rehydrate(
+                id: 0,
+                clientId: p.ClientId,
+                sellerId: p.SellerId,
+                productId: p.ProductId,
+                productName: prod.Name,
+                cantidad: p.Cantidad,
+                precioUnitario: prod.BasePrice,
+                total: p.Cantidad * prod.BasePrice,
+                fecha: now,
+                estado: OrderStatuses.Pendiente,
+                orderNumber: p.OrderNumber));
         }
 
         var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(ct) : null;

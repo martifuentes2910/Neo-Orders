@@ -148,17 +148,19 @@ public class ListFiltersContractTests : IClassFixture<NeoOrdersApiFactory>
         Stock = stock
     };
 
-    private static Order NewOrder(int clientId, int sellerId, string productName, string estado, string orderNumber) => new()
-    {
-        ClientId = clientId,
-        SellerId = sellerId,
-        ProductName = productName,
-        Cantidad = 1,
-        PrecioUnitario = 10m,
-        Total = 10m,
-        Estado = estado,
-        OrderNumber = orderNumber
-    };
+    private static Order NewOrder(int clientId, int sellerId, string productName, string estado, string orderNumber) =>
+        Order.Rehydrate(
+            id: 0,
+            clientId: clientId,
+            sellerId: sellerId,
+            productId: null,
+            productName: productName,
+            cantidad: 1,
+            precioUnitario: 10m,
+            total: 10m,
+            fecha: DateTime.UtcNow,
+            estado: estado,
+            orderNumber: orderNumber);
 
     private static async Task<List<int>> ReadIdsAsync(HttpResponseMessage response)
     {

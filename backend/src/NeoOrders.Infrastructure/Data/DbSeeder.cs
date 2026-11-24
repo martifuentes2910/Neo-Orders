@@ -92,18 +92,18 @@ public static class DbSeeder
                 var estado = estados[rnd.Next(estados.Length)];
                 if (i % 7 == 0) estado = OrderStatuses.Entregado;
                 if (i % 11 == 0) estado = OrderStatuses.Pendiente;
-                pedidos.Add(new Order
-                {
-                    ClientId = cliente.Id,
-                    SellerId = seller.Id,
-                    ProductId = product.Id,
-                    ProductName = product.Name,
-                    Cantidad = cantidad,
-                    PrecioUnitario = product.BasePrice,
-                    Total = cantidad * product.BasePrice,
-                    Fecha = fecha,
-                    Estado = estado
-                });
+                pedidos.Add(Order.Rehydrate(
+                    id: 0,
+                    clientId: cliente.Id,
+                    sellerId: seller.Id,
+                    productId: product.Id,
+                    productName: product.Name,
+                    cantidad: cantidad,
+                    precioUnitario: product.BasePrice,
+                    total: cantidad * product.BasePrice,
+                    fecha: fecha,
+                    estado: estado,
+                    orderNumber: null));
             }
             db.Orders.AddRange(pedidos);
             await db.SaveChangesAsync();

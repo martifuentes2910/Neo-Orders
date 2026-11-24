@@ -39,7 +39,7 @@ public class OrderServiceTests
         using var db = CreateDb();
         db.Clients.Add(new Client { Id = 1, Nombre = "C", Email = "c@c.com" });
         db.Products.Add(new Product { Id = 1, Sku = "SKU1", Name = "Prod", Category = "Cat", BasePrice = 10m, Stock = 5, Active = true });
-        db.Orders.Add(new Order { ClientId = 1, ProductId = 1, ProductName = "Prod", Cantidad = 1, PrecioUnitario = 10m, Total = 10m, Estado = OrderStatuses.Pendiente, OrderNumber = "ORD-1" });
+        db.Orders.Add(Order.Rehydrate(0, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatuses.Pendiente, "ORD-1"));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
@@ -55,7 +55,7 @@ public class OrderServiceTests
         using var db = CreateDb();
         db.Clients.Add(new Client { Id = 1, Nombre = "C", Email = "c@c.com" });
         db.Products.Add(new Product { Id = 1, Sku = "SKU1", Name = "Prod", Category = "Cat", BasePrice = 10m, Stock = 5, Active = true });
-        db.Orders.Add(new Order { Id = 1, ClientId = 1, ProductId = 1, ProductName = "Prod", Cantidad = 2, PrecioUnitario = 10m, Total = 20m, Estado = OrderStatuses.Pendiente });
+        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatuses.Pendiente, null));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
@@ -71,7 +71,7 @@ public class OrderServiceTests
     {
         using var db = CreateDb();
         db.Products.Add(new Product { Id = 1, Sku = "SKU1", Name = "Prod", Category = "Cat", BasePrice = 10m, Stock = 3, Active = true });
-        db.Orders.Add(new Order { Id = 1, ClientId = 1, ProductId = 1, ProductName = "Prod", Cantidad = 2, PrecioUnitario = 10m, Total = 20m, Estado = OrderStatuses.Procesado });
+        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatuses.Procesado, null));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
@@ -85,7 +85,7 @@ public class OrderServiceTests
     public async Task UpdateStatus_InvalidTransition_ReturnsError()
     {
         using var db = CreateDb();
-        db.Orders.Add(new Order { Id = 1, ClientId = 1, ProductId = 1, ProductName = "Prod", Cantidad = 1, PrecioUnitario = 10m, Total = 10m, Estado = OrderStatuses.Pendiente });
+        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatuses.Pendiente, null));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);

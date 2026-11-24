@@ -554,18 +554,18 @@ public class CsvImportContractTests : IClassFixture<NeoOrdersApiFactory>
         TestAuthClient auth, int clientId, int sellerId, int productId, string orderNumber) =>
         await auth.QueryDbAsync(async db =>
         {
-            var order = new Order
-            {
-                OrderNumber = orderNumber,
-                ClientId = clientId,
-                SellerId = sellerId,
-                ProductId = productId,
-                ProductName = "Pedido existente CSV",
-                Cantidad = 1,
-                PrecioUnitario = 10.50m,
-                Total = 10.50m,
-                Estado = "Pendiente"
-            };
+            var order = Order.Rehydrate(
+                id: 0,
+                clientId: clientId,
+                sellerId: sellerId,
+                productId: productId,
+                productName: "Pedido existente CSV",
+                cantidad: 1,
+                precioUnitario: 10.50m,
+                total: 10.50m,
+                fecha: DateTime.UtcNow,
+                estado: "Pendiente",
+                orderNumber: orderNumber);
             db.Orders.Add(order);
             await db.SaveChangesAsync();
             return order.Id;
