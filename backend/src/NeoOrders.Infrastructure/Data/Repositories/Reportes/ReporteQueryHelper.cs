@@ -1,8 +1,7 @@
 using NeoOrders.Application.Contracts.Reportes;
-using NeoOrders.Infrastructure.Models;
-
 using NeoOrders.Application.DTOs.Reportes;
 using NeoOrders.Domain.Orders;
+
 namespace NeoOrders.Infrastructure.Data.Repositories.Reportes;
 
 /// <summary>Filtros y exclusiones compartidos por todos los repositorios de reportes.</summary>

@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 

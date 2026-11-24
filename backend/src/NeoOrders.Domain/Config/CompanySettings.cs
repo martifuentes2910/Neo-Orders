@@ -1,19 +1,11 @@
-using System.ComponentModel.DataAnnotations;
+namespace NeoOrders.Domain.Config;
 
-namespace NeoOrders.Infrastructure.Models;
-
+// KAN-38: definición persistible de la configuración de la empresa.
+// El esquema se configura en Infrastructure/Data/Configurations/CompanySettingsConfiguration.
 public class CompanySettings
 {
     public int Id { get; set; }
-
-    [Required]
-    [StringLength(120)]
     public string NombreEmpresa { get; set; } = "NeoOrders";
-
-    [Required]
-    [StringLength(10)]
     public string Moneda { get; set; } = "ARS";
-
-    [Range(0.0001, 1000000)]
     public decimal TipoDeCambio { get; set; } = 1m;
 }

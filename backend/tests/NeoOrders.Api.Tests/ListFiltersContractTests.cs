@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text.Json;
 using NeoOrders.Domain.Orders;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Api.Tests;
 

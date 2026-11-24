@@ -1,8 +1,7 @@
-﻿using System.Text;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Domain.Orders;
 using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
 using NeoOrders.Infrastructure.Services;
 
 namespace NeoOrders.Infrastructure.Tests;

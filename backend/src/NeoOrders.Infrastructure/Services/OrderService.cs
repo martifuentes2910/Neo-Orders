@@ -2,7 +2,6 @@ using NeoOrders.Application.Contracts.Orders;
 using NeoOrders.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Infrastructure.Services;
 
@@ -34,19 +33,10 @@ public class OrderService : IOrderService
         var prod = await _db.Products.FindAsync(productId.Value);
         if (prod == null) return new OrderResult { Success = false, Error = "Producto no válido" };
 
-        var order = new Order
-        {
-            OrderNumber = normalizedOrderNumber,
-            ClientId = clientId,
-            SellerId = sellerId,
-            ProductId = productId,
-            ProductName = prod.Name,
-            Cantidad = cantidad,
-            PrecioUnitario = prod.BasePrice,
-            Total = cantidad * prod.BasePrice,
-            Fecha = DateTime.UtcNow,
-            Estado = OrderStatuses.Pendiente
-        };
+        // KAN-38: una sola definición de Order (dominio + persistencia), sin mapas Domain/Ef.
+        var order = Order.CreateNew(
+            clientId, sellerId, productId, prod.Name, cantidad, prod.BasePrice,
+            DateTime.UtcNow, normalizedOrderNumber);
         _db.Orders.Add(order);
         await _db.SaveChangesAsync();
         return new OrderResult { Success = true, OrderId = order.Id, ProductName = order.ProductName };
@@ -57,7 +47,7 @@ public class OrderService : IOrderService
         var existing = await _db.Orders.FindAsync(id);
         if (existing == null)
             return new OrderResult { Success = false, NotFound = true, Error = "Pedido no encontrado" };
-        if (OrderStatuses.EditLocked.Contains(existing.Estado))
+        if (existing.IsEditLocked)
             return new OrderResult { Success = false, Error = $"El pedido está {existing.Estado}: no se puede editar, solo cambiar el estado" };
         if (!await _db.Clients.AnyAsync(c => c.Id == clientId))
             return new OrderResult { Success = false, Error = "Cliente no válido" };
@@ -67,16 +57,13 @@ public class OrderService : IOrderService
             return new OrderResult { Success = false, Error = "Cantidad inválida" };
         if (!OrderStatuses.IsValid(estado))
             return new OrderResult { Success = false, Error = "Estado no válido" };
-        if (!OrderStatuses.CanTransition(existing.Estado, estado))
+        if (!existing.CanTransitionTo(estado))
             return new OrderResult { Success = false, Error = $"Transición de estado no permitida: {existing.Estado} → {estado}" };
 
         var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync() : null;
         try
         {
-            existing.ClientId = clientId;
-            existing.SellerId = sellerId;
-            existing.Cantidad = cantidad;
-            existing.Total = cantidad * existing.PrecioUnitario;
+            existing.UpdateDetails(clientId, sellerId, cantidad);
 
             var transition = await ApplyStatusTransitionAsync(existing, estado);
             if (!transition.Success)
@@ -107,7 +94,7 @@ public class OrderService : IOrderService
             return new OrderResult { Success = false, NotFound = true, Error = "Pedido no encontrado" };
         if (!OrderStatuses.IsValid(estado))
             return new OrderResult { Success = false, Error = "Estado no válido" };
-        if (!OrderStatuses.CanTransition(existing.Estado, estado))
+        if (!existing.CanTransitionTo(estado))
             return new OrderResult { Success = false, Error = $"Transición de estado no permitida: {existing.Estado} → {estado}" };
 
         var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync() : null;
@@ -144,48 +131,44 @@ public class OrderService : IOrderService
         return true;
     }
 
-    // KAN-35/KAN-38: Única rutina de transición. Aplica efectos de stock y cambia estado.
-    // No llama SaveChanges; el caller controla transacción/persistencia.
+    // KAN-35/KAN-38: única rutina de transición. El dominio decide transición y efecto de stock;
+    // Infrastructure sólo aplica el efecto y persiste. No llama SaveChanges.
     private async Task<OrderResult> ApplyStatusTransitionAsync(Order order, string newStatusRaw)
     {
-        if (!OrderStatusMapper.TryParse(newStatusRaw, out var newStatus))
-            return new OrderResult { Success = false, Error = "Estado no válido" };
-        if (!OrderStatusMapper.TryParse(order.Estado, out var currentStatus))
-            return new OrderResult { Success = false, Error = "Estado actual no válido" };
+        var change = order.PlanStatusChange(newStatusRaw);
+        if (!change.Success)
+            return new OrderResult { Success = false, Error = change.Error };
 
-        var newStatusValue = newStatus.ToExternal();
-        if (!OrderStatuses.CanTransition(currentStatus, newStatus))
-            return new OrderResult { Success = false, Error = $"Transición de estado no permitida: {order.Estado} → {newStatusValue}" };
-
-        if (currentStatus == newStatus)
-            return new OrderResult { Success = true, OrderId = order.Id, ProductName = order.ProductName };
-
-        if (OrderStatuses.DecreasesStock(currentStatus, newStatus))
+        if (!change.IsNoOp)
         {
-            if (!order.ProductId.HasValue)
-                return new OrderResult { Success = false, Error = "No se puede procesar: el pedido no tiene un producto de catálogo asociado" };
+            if (change.StockEffect == OrderStockEffect.Decrease)
+            {
+                if (!order.ProductId.HasValue)
+                    return new OrderResult { Success = false, Error = "No se puede procesar: el pedido no tiene un producto de catálogo asociado" };
 
-            var product = await GetProductForStockUpdateAsync(order.ProductId.Value);
-            if (product == null)
-                return new OrderResult { Success = false, Error = "No se puede procesar: el producto del pedido ya no existe en el catálogo" };
-            if (product.Stock < order.Cantidad)
-                return new OrderResult { Success = false, Error = "Stock insuficiente" };
+                var product = await GetProductForStockUpdateAsync(order.ProductId.Value);
+                if (product == null)
+                    return new OrderResult { Success = false, Error = "No se puede procesar: el producto del pedido ya no existe en el catálogo" };
+                if (product.Stock < order.Cantidad)
+                    return new OrderResult { Success = false, Error = "Stock insuficiente" };
 
-            product.Stock -= order.Cantidad;
-        }
-        else if (OrderStatuses.RestoresStock(currentStatus, newStatus))
-        {
-            if (!order.ProductId.HasValue)
-                return new OrderResult { Success = false, Error = "No se puede cancelar: el pedido no tiene un producto de catálogo asociado para reembolsar stock" };
+                product.Stock -= order.Cantidad;
+            }
+            else if (change.StockEffect == OrderStockEffect.Restore)
+            {
+                if (!order.ProductId.HasValue)
+                    return new OrderResult { Success = false, Error = "No se puede cancelar: el pedido no tiene un producto de catálogo asociado para reembolsar stock" };
 
-            var product = await GetProductForStockUpdateAsync(order.ProductId.Value);
-            if (product == null)
-                return new OrderResult { Success = false, Error = "No se puede cancelar: el producto del pedido ya no existe en el catálogo para reembolsar stock" };
+                var product = await GetProductForStockUpdateAsync(order.ProductId.Value);
+                if (product == null)
+                    return new OrderResult { Success = false, Error = "No se puede cancelar: el producto del pedido ya no existe en el catálogo para reembolsar stock" };
 
-            product.Stock += order.Cantidad;
+                product.Stock += order.Cantidad;
+            }
+
+            order.ApplyStatusChange(change);
         }
 
-        order.Estado = newStatusValue;
         return new OrderResult { Success = true, OrderId = order.Id, ProductName = order.ProductName };
     }
 

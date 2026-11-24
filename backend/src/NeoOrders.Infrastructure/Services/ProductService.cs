@@ -5,7 +5,6 @@ using NeoOrders.Application.DTOs.Productos;
 using NeoOrders.Application.DTOs.Products;
 using NeoOrders.Application.Services;
 using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Infrastructure.Services;
 

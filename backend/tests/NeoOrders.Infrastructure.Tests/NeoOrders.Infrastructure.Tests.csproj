@@ -19,5 +19,11 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="NeoOrders.Domain.Clients" />
+    <Using Include="NeoOrders.Domain.Config" />
+    <Using Include="NeoOrders.Domain.Notifications" />
+    <Using Include="NeoOrders.Domain.Orders" />
+    <Using Include="NeoOrders.Domain.Products" />
+    <Using Include="NeoOrders.Domain.Sellers" />
   </ItemGroup>
 </Project>

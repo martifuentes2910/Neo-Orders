@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using NeoOrders.Application.Contracts.Config;
 using NeoOrders.Application.DTOs.Config;
 using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
 
 namespace NeoOrders.Infrastructure.Services;
 
