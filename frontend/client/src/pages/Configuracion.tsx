@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import UserAvatar, { AVATAR_KEYS } from '@/components/UserAvatar';
+import UserAvatar from '@/components/UserAvatar';
+import { AVATAR_KEYS } from '@/lib/avatars';
 import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
 import { useDatosConfig, useEmpresaForm, usePerfilForm } from '@/features/config';
@@ -400,35 +401,36 @@ function UsuariosTab() {
   );
 }
 
+const EMAIL = 'soporte@neoorders.example';
+const TELEFONO = '+54 11 0000-0000';
+
+function plantillaBug(): string {
+  const ruta = window.location.pathname;
+  const fecha = new Date().toLocaleString('es-AR');
+  const navegador = navigator.userAgent;
+  return [
+    'Hola equipo de soporte de NeoOrders,',
+    '',
+    'Quiero reportar un problema:',
+    '',
+    `- Ruta: ${ruta}`,
+    '- Rol: [Admin/Empleado]',
+    `- Navegador: ${navegador}`,
+    `- Fecha y hora: ${fecha}`,
+    '- Descripción: [qué pasó]',
+    '- Pasos para reproducir:',
+    '  1. [paso 1]',
+    '  2. [paso 2]',
+    '  3. [paso 3]',
+    '- Resultado esperado: [qué esperabas]',
+    '- Resultado obtenido: [qué pasó realmente]',
+    '',
+    'Gracias.',
+  ].join('\n');
+}
+
 function SoporteTab() {
   const [copiado, setCopiado] = useState<'email' | 'plantilla' | null>(null);
-  const EMAIL = 'soporte@neoorders.example';
-  const TELEFONO = '+54 11 0000-0000';
-
-  const plantillaBug = () => {
-    const ruta = window.location.pathname;
-    const fecha = new Date().toLocaleString('es-AR');
-    const navegador = navigator.userAgent;
-    return [
-      'Hola equipo de soporte de NeoOrders,',
-      '',
-      'Quiero reportar un problema:',
-      '',
-      `- Ruta: ${ruta}`,
-      '- Rol: [Admin/Empleado]',
-      `- Navegador: ${navegador}`,
-      `- Fecha y hora: ${fecha}`,
-      '- Descripción: [qué pasó]',
-      '- Pasos para reproducir:',
-      '  1. [paso 1]',
-      '  2. [paso 2]',
-      '  3. [paso 3]',
-      '- Resultado esperado: [qué esperabas]',
-      '- Resultado obtenido: [qué pasó realmente]',
-      '',
-      'Gracias.',
-    ].join('\n');
-  };
 
   const copiar = async (texto: string, tipo: 'email' | 'plantilla') => {
     try {

@@ -1,12 +1,7 @@
 import Avatar, { genConfig } from 'react-nice-avatar';
 import { useTheme } from '../context/ThemeContext';
 import { cn } from '@/lib/utils';
-
-/** Cantidad de avatares prediseñados disponibles (claves avatar-1 … avatar-N). */
-export const AVATAR_COUNT = 12;
-
-/** Claves estables para el selector y los formularios. */
-export const AVATAR_KEYS = Array.from({ length: AVATAR_COUNT }, (_, i) => `avatar-${i + 1}`);
+import { AVATAR_COUNT } from '@/lib/avatars';
 
 function avatarSeed(avatar?: string): string {
   const n = Number.parseInt((avatar || 'avatar-1').replace('avatar-', ''), 10);
