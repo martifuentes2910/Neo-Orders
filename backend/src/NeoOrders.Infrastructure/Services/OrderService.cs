@@ -152,7 +152,7 @@ public class OrderService : IOrderService
                 if (product.Stock < order.Cantidad)
                     return new OrderResult { Success = false, Error = "Stock insuficiente" };
 
-                product.Stock -= order.Cantidad;
+                product.AdjustStock(-order.Cantidad);
             }
             else if (change.StockEffect == OrderStockEffect.Restore)
             {
@@ -163,7 +163,7 @@ public class OrderService : IOrderService
                 if (product == null)
                     return new OrderResult { Success = false, Error = "No se puede cancelar: el producto del pedido ya no existe en el catálogo para reembolsar stock" };
 
-                product.Stock += order.Cantidad;
+                product.AdjustStock(order.Cantidad);
             }
 
             order.ApplyStatusChange(change);

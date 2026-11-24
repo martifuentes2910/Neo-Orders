@@ -19,8 +19,8 @@ public class OrderServiceTests
     public async Task CreateAsync_CreatesPendingOrder_WithoutDecreasingStock()
     {
         using var db = CreateDb();
-        db.Clients.Add(new Client { Id = 1, Nombre = "C", Email = "c@c.com" });
-        db.Products.Add(new Product { Id = 1, Sku = "SKU1", Name = "Prod", Category = "Cat", BasePrice = 10m, Stock = 5, Active = true });
+        db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
+        db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
@@ -37,8 +37,8 @@ public class OrderServiceTests
     public async Task CreateAsync_RejectsDuplicateOrderNumber()
     {
         using var db = CreateDb();
-        db.Clients.Add(new Client { Id = 1, Nombre = "C", Email = "c@c.com" });
-        db.Products.Add(new Product { Id = 1, Sku = "SKU1", Name = "Prod", Category = "Cat", BasePrice = 10m, Stock = 5, Active = true });
+        db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
+        db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
         db.Orders.Add(Order.Rehydrate(0, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatuses.Pendiente, "ORD-1"));
         await db.SaveChangesAsync();
 
@@ -53,8 +53,8 @@ public class OrderServiceTests
     public async Task UpdateStatus_PendienteToProcesado_DecreasesStock()
     {
         using var db = CreateDb();
-        db.Clients.Add(new Client { Id = 1, Nombre = "C", Email = "c@c.com" });
-        db.Products.Add(new Product { Id = 1, Sku = "SKU1", Name = "Prod", Category = "Cat", BasePrice = 10m, Stock = 5, Active = true });
+        db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
+        db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
         db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatuses.Pendiente, null));
         await db.SaveChangesAsync();
 
@@ -70,7 +70,7 @@ public class OrderServiceTests
     public async Task UpdateStatus_ProcesadoToCancelado_RefundsStock()
     {
         using var db = CreateDb();
-        db.Products.Add(new Product { Id = 1, Sku = "SKU1", Name = "Prod", Category = "Cat", BasePrice = 10m, Stock = 3, Active = true });
+        db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 3, active: true));
         db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatuses.Procesado, null));
         await db.SaveChangesAsync();
 

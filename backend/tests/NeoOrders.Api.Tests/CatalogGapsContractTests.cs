@@ -217,11 +217,7 @@ public class CatalogGapsContractTests : IClassFixture<NeoOrdersApiFactory>
     private static Task<int> SeedClientForListAsync(TestAuthClient auth, string suffix) =>
         auth.QueryDbAsync(async db =>
         {
-            var client = new Client
-            {
-                Nombre = $"Cliente lista {suffix}",
-                Email = $"cliente.lista.{suffix}@test.local"
-            };
+            var client = Client.Create($"Cliente lista {suffix}", $"cliente.lista.{suffix}@test.local");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -232,28 +228,24 @@ public class CatalogGapsContractTests : IClassFixture<NeoOrdersApiFactory>
     {
         return await auth.QueryDbAsync(async db =>
         {
-            var active = new Product
-            {
-                Sku = $"SKU-ADJ-ACTIVE-{suffix}",
-                Name = $"Activo {suffix}",
-                Category = "General",
-                BasePrice = activeBasePrice,
-                Cost = 5.00m,
-                Stock = 5,
-                MinStockAlert = 1,
-                Active = true
-            };
-            var inactive = new Product
-            {
-                Sku = $"SKU-ADJ-INACTIVE-{suffix}",
-                Name = $"Inactivo {suffix}",
-                Category = "General",
-                BasePrice = inactiveBasePrice,
-                Cost = 25.00m,
-                Stock = 5,
-                MinStockAlert = 1,
-                Active = false
-            };
+            var active = Product.Create(
+                sku: $"SKU-ADJ-ACTIVE-{suffix}",
+                name: $"Activo {suffix}",
+                category: "General",
+                basePrice: activeBasePrice,
+                cost: 5.00m,
+                stock: 5,
+                minStockAlert: 1,
+                active: true);
+            var inactive = Product.Create(
+                sku: $"SKU-ADJ-INACTIVE-{suffix}",
+                name: $"Inactivo {suffix}",
+                category: "General",
+                basePrice: inactiveBasePrice,
+                cost: 25.00m,
+                stock: 5,
+                minStockAlert: 1,
+                active: false);
             db.Products.AddRange(active, inactive);
             await db.SaveChangesAsync();
             return (active.Id, inactive.Id);
@@ -267,8 +259,8 @@ public class CatalogGapsContractTests : IClassFixture<NeoOrdersApiFactory>
         return await auth.QueryDbAsync(async db =>
         {
             db.Sellers.AddRange(
-                new Seller { Name = activeName, Email = $"seller.active.{suffix}@test.local", Active = true },
-                new Seller { Name = inactiveName, Email = $"seller.inactive.{suffix}@test.local", Active = false });
+                Seller.Create(activeName, $"seller.active.{suffix}@test.local", active: true),
+                Seller.Create(inactiveName, $"seller.inactive.{suffix}@test.local", active: false));
             await db.SaveChangesAsync();
             return (activeName, inactiveName);
         });
@@ -281,8 +273,8 @@ public class CatalogGapsContractTests : IClassFixture<NeoOrdersApiFactory>
         return await auth.QueryDbAsync(async db =>
         {
             db.Products.AddRange(
-                new Product { Sku = $"SKU-CAT-A-{suffix}", Name = $"Prod A {suffix}", Category = first, BasePrice = 10m, Cost = 5m, Stock = 1, MinStockAlert = 1 },
-                new Product { Sku = $"SKU-CAT-B-{suffix}", Name = $"Prod B {suffix}", Category = second, BasePrice = 20m, Cost = 10m, Stock = 1, MinStockAlert = 1 });
+                Product.Create($"SKU-CAT-A-{suffix}", $"Prod A {suffix}", first, 10m, 5m, 1, 1),
+                Product.Create($"SKU-CAT-B-{suffix}", $"Prod B {suffix}", second, 20m, 10m, 1, 1));
             await db.SaveChangesAsync();
             return (first, second);
         });

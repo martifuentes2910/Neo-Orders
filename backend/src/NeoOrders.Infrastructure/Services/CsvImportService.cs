@@ -6,7 +6,10 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Application.DTOs.Import;
 using NeoOrders.Infrastructure.Data;
+using NeoOrders.Domain.Clients;
 using NeoOrders.Domain.Orders;
+using NeoOrders.Domain.Products;
+using NeoOrders.Domain.Sellers;
 
 namespace NeoOrders.Infrastructure.Services;
 
@@ -62,14 +65,12 @@ public sealed class CsvImportService : ICsvImportService
 
             if (errors.Any(e => e.Row == rowNum)) continue;
 
-            candidates.Add(new Client
-            {
-                Nombre = name,
-                Email = email,
-                Telefono = NullIfEmpty(phone),
-                Direccion = NullIfEmpty(address),
-                FechaAlta = DateTime.UtcNow
-            });
+            candidates.Add(Client.Create(
+                nombre: name,
+                email: email,
+                telefono: NullIfEmpty(phone),
+                direccion: NullIfEmpty(address),
+                fechaAlta: DateTime.UtcNow));
         }
 
         if (errors.Count > 0) return result;
@@ -164,18 +165,16 @@ public sealed class CsvImportService : ICsvImportService
 
             if (errors.Any(e => e.Row == rowNum)) continue;
 
-            candidates.Add(new Product
-            {
-                Sku = sku,
-                Name = name,
-                Category = category,
-                BasePrice = decimal.Round(basePrice, 2, MidpointRounding.AwayFromZero),
-                Cost = decimal.Round(cost, 2, MidpointRounding.AwayFromZero),
-                Stock = stock,
-                MinStockAlert = minStock,
-                Active = active,
-                CreatedAt = DateTime.UtcNow
-            });
+            candidates.Add(Product.Create(
+                sku: sku,
+                name: name,
+                category: category,
+                basePrice: decimal.Round(basePrice, 2, MidpointRounding.AwayFromZero),
+                cost: decimal.Round(cost, 2, MidpointRounding.AwayFromZero),
+                stock: stock,
+                minStockAlert: minStock,
+                active: active,
+                createdAt: DateTime.UtcNow));
         }
 
         if (errors.Count > 0) return result;

@@ -26,16 +26,8 @@ public class ListFiltersContractTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         var (matchId, otherId) = await auth.QueryDbAsync(async db =>
         {
-            var match = new Client
-            {
-                Nombre = $"Cliente buscado {suffix}",
-                Email = $"buscado.{suffix}@test.local"
-            };
-            var other = new Client
-            {
-                Nombre = $"Cliente otro {Guid.NewGuid():N}",
-                Email = $"otro.{Guid.NewGuid():N}@test.local"
-            };
+            var match = Client.Create($"Cliente buscado {suffix}", $"buscado.{suffix}@test.local");
+            var other = Client.Create($"Cliente otro {Guid.NewGuid():N}", $"otro.{Guid.NewGuid():N}@test.local");
             db.Clients.AddRange(match, other);
             await db.SaveChangesAsync();
             return (match.Id, other.Id);
@@ -105,10 +97,10 @@ public class ListFiltersContractTests : IClassFixture<NeoOrdersApiFactory>
         var (firstId, secondId, firstClientId, secondClientId, firstSellerId, secondSellerId) =
             await auth.QueryDbAsync(async db =>
             {
-                var firstClient = new Client { Nombre = $"Cliente A {suffix}", Email = $"a.{suffix}@test.local" };
-                var secondClient = new Client { Nombre = $"Cliente B {suffix}", Email = $"b.{suffix}@test.local" };
-                var firstSeller = new Seller { Name = $"Vendedor A {suffix}", Email = $"va.{suffix}@test.local" };
-                var secondSeller = new Seller { Name = $"Vendedor B {suffix}", Email = $"vb.{suffix}@test.local" };
+                var firstClient = Client.Create($"Cliente A {suffix}", $"a.{suffix}@test.local");
+                var secondClient = Client.Create($"Cliente B {suffix}", $"b.{suffix}@test.local");
+                var firstSeller = Seller.Create($"Vendedor A {suffix}", $"va.{suffix}@test.local");
+                var secondSeller = Seller.Create($"Vendedor B {suffix}", $"vb.{suffix}@test.local");
                 db.AddRange(firstClient, secondClient, firstSeller, secondSeller);
                 await db.SaveChangesAsync();
 
@@ -138,15 +130,8 @@ public class ListFiltersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal(new[] { secondId }, byOtroVendedor);
     }
 
-    private static Product NewProduct(string sku, string name, string category, int stock) => new()
-    {
-        Sku = sku,
-        Name = name,
-        Category = category,
-        BasePrice = 10m,
-        Cost = 5m,
-        Stock = stock
-    };
+    private static Product NewProduct(string sku, string name, string category, int stock) =>
+        Product.Create(sku, name, category, basePrice: 10m, cost: 5m, stock: stock);
 
     private static Order NewOrder(int clientId, int sellerId, string productName, string estado, string orderNumber) =>
         Order.Rehydrate(

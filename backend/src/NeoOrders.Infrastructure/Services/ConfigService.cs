@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NeoOrders.Application.Contracts.Config;
 using NeoOrders.Application.DTOs.Config;
+using NeoOrders.Domain.Config;
 using NeoOrders.Infrastructure.Data;
 
 namespace NeoOrders.Infrastructure.Services;
@@ -13,17 +14,15 @@ public class ConfigService : IConfigService
     public async Task<CompanySettingsDto> GetCompanyAsync()
     {
         var s = await _db.CompanySettings.FirstOrDefaultAsync();
-        if (s == null) { s = new CompanySettings(); _db.CompanySettings.Add(s); await _db.SaveChangesAsync(); }
+        if (s == null) { s = CompanySettings.Create(); _db.CompanySettings.Add(s); await _db.SaveChangesAsync(); }
         return Map(s);
     }
 
     public async Task<CompanySettingsDto> UpdateCompanyAsync(CompanySettingsDto dto)
     {
         var s = await _db.CompanySettings.FirstOrDefaultAsync();
-        if (s == null) { s = new CompanySettings(); _db.CompanySettings.Add(s); }
-        s.NombreEmpresa = dto.NombreEmpresa;
-        s.Moneda = dto.Moneda;
-        s.TipoDeCambio = dto.TipoDeCambio;
+        if (s == null) { s = CompanySettings.Create(); _db.CompanySettings.Add(s); }
+        s.UpdateDetails(dto.NombreEmpresa, dto.Moneda, dto.TipoDeCambio);
         await _db.SaveChangesAsync();
         return Map(s);
     }

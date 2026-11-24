@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NeoOrders.Application.Contracts.Notifications;
 using NeoOrders.Application.DTOs.Notifications;
+using NeoOrders.Domain.Notifications;
 using NeoOrders.Domain.Orders;
 using NeoOrders.Infrastructure.Data;
 using NeoOrders.Infrastructure.Models;
@@ -51,17 +52,15 @@ public class NotificationService : INotificationService
                 }
             }
 
-            _db.Notifications.Add(new Notification
-            {
-                Tipo = tipo,
-                Accion = accion,
-                Titulo = titulo,
-                Mensaje = mensaje,
-                Link = link,
-                Usuario = actor,
-                EntidadId = entidadId,
-                Fecha = DateTime.UtcNow
-            });
+            _db.Notifications.Add(Notification.Create(
+                tipo: tipo,
+                accion: accion,
+                titulo: titulo,
+                mensaje: mensaje,
+                link: link,
+                usuario: actor,
+                entidadId: entidadId,
+                fecha: DateTime.UtcNow));
             await _db.SaveChangesAsync();
         }
         catch (Exception ex)

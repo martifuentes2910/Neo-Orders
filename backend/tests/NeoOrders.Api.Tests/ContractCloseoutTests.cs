@@ -437,11 +437,7 @@ public class ContractCloseoutTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return await auth.QueryDbAsync(async db =>
         {
-            var client = new Client
-            {
-                Nombre = $"Cliente cierre {suffix}",
-                Email = email ?? $"cierre.client.{suffix}@test.local"
-            };
+            var client = Client.Create($"Cliente cierre {suffix}", email ?? $"cierre.client.{suffix}@test.local");
             db.Clients.Add(client);
             await db.SaveChangesAsync();
             return client.Id;
@@ -453,12 +449,7 @@ public class ContractCloseoutTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return await auth.QueryDbAsync(async db =>
         {
-            var seller = new Seller
-            {
-                Name = $"Vendedor cierre {suffix}",
-                Email = $"cierre.seller.{suffix}@test.local",
-                Active = active
-            };
+            var seller = Seller.Create($"Vendedor cierre {suffix}", $"cierre.seller.{suffix}@test.local", active: active);
             db.Sellers.Add(seller);
             await db.SaveChangesAsync();
             return seller.Id;
@@ -470,17 +461,15 @@ public class ContractCloseoutTests : IClassFixture<NeoOrdersApiFactory>
         var suffix = Guid.NewGuid().ToString("N");
         return await auth.QueryDbAsync(async db =>
         {
-            var product = new Product
-            {
-                Sku = sku ?? $"SKU-CIERRE-{suffix}",
-                Name = $"Producto cierre {suffix}",
-                Category = "General",
-                BasePrice = 10.50m,
-                Cost = 5.25m,
-                Stock = stock,
-                MinStockAlert = 1,
-                Active = active
-            };
+            var product = Product.Create(
+                sku ?? $"SKU-CIERRE-{suffix}",
+                $"Producto cierre {suffix}",
+                "General",
+                10.50m,
+                5.25m,
+                stock,
+                1,
+                active);
             db.Products.Add(product);
             await db.SaveChangesAsync();
             return product.Id;
