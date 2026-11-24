@@ -46,13 +46,13 @@ export default function CsvImportDialog({ open, onOpenChange, title, templateUrl
       const res = await onImport(file);
       setResult(res);
       await onImported();
-    } catch (err: any) {
-      const body = err?.body;
+    } catch (err: unknown) {
+      const body = (err as { body?: CsvImportResult })?.body;
       if (body?.errors && Array.isArray(body.errors)) {
         setResult({ totalRows: body.totalRows ?? 0, validRows: body.validRows ?? 0, imported: body.imported ?? 0, errors: body.errors });
         setError('El archivo contiene errores. No se importó ninguna fila.');
       } else {
-        setError(err?.message || 'No se pudo importar el archivo.');
+        setError(err instanceof Error ? err.message : 'No se pudo importar el archivo.');
       }
     } finally {
       setLoading(false);

@@ -7,8 +7,10 @@
     <Project Path="backend/src/NeoOrders.Infrastructure/NeoOrders.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/backend/tests/">
+    <Project Path="backend/tests/NeoOrders.Api.Tests/NeoOrders.Api.Tests.csproj" />
     <Project Path="backend/tests/NeoOrders.Application.Tests/NeoOrders.Application.Tests.csproj" />
     <Project Path="backend/tests/NeoOrders.Architecture.Tests/NeoOrders.Architecture.Tests.csproj" />
     <Project Path="backend/tests/NeoOrders.Domain.Tests/NeoOrders.Domain.Tests.csproj" />
+    <Project Path="backend/tests/NeoOrders.Infrastructure.Tests/NeoOrders.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

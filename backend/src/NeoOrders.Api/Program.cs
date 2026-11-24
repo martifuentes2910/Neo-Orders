@@ -37,6 +37,7 @@ builder.Services.AddScoped<IOrderQueryService, OrderQueryService>();
 builder.Services.AddScoped<NeoOrders.Application.Contracts.Clients.IClientService, ClientService>();
 builder.Services.AddScoped<NeoOrders.Application.Contracts.Sellers.ISellerService, SellerService>();
 builder.Services.AddScoped<NeoOrders.Application.Contracts.Config.IConfigService, ConfigService>();
+builder.Services.AddScoped<NeoOrders.Application.Contracts.Products.IProductService, ProductService>();
 
 // Reportes: contratos en Application, implementaciones en Data (DIP).
 builder.Services.AddScoped<IReporteResumenRepository, ReporteResumenRepository>();
@@ -119,17 +120,27 @@ builder.Services.AddAntiforgery(options =>
 });
 
 // CORS
+var frontendOrigins = builder.Configuration.GetSection("Frontend:Origins").Get<string[]>();
+if (frontendOrigins is null || frontendOrigins.Length == 0)
+{
+    var csv = builder.Configuration["Frontend:Origins"];
+    frontendOrigins = !string.IsNullOrWhiteSpace(csv)
+        ? csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        : [
+            "http://localhost:5173",
+            "https://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173"
+        ];
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5173",
-                "https://localhost:5173",
-                "http://127.0.0.1:5173",
-                "https://127.0.0.1:5173",
-                "http://localhost:4173",
-                "http://127.0.0.1:4173")
+        policy.WithOrigins(frontendOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -157,14 +168,28 @@ if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
-        db.Database.Migrate();
-        await DbSeeder.SeedAsync(scope.ServiceProvider);
+        if (db.Database.IsRelational())
+            db.Database.Migrate();
+        else
+            db.Database.EnsureCreated();
+
+        var seedOnStartup = builder.Configuration.GetValue<bool?>("Seed:RunOnStartup")
+            ?? app.Environment.IsDevelopment();
+        if (seedOnStartup)
+        {
+            await DbSeeder.SeedAsync(scope.ServiceProvider);
+            logger.LogInformation("Seed de inicio ejecutado.");
+        }
+        else
+        {
+            logger.LogInformation("Seed de inicio omitido por configuración.");
+        }
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "Error al migrar/sembrar la base de datos.");
     }
 }
@@ -187,3 +212,5 @@ app.MapGet("/api/antiforgery/token", (IAntiforgery antiforgery, HttpContext cont
 }).RequireAuthorization();
 
 app.Run();
+
+public partial class Program { }

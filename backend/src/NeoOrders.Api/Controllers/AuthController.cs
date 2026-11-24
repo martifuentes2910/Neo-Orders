@@ -43,9 +43,9 @@ public class AuthController : ControllerBase
     [HttpGet("me")]
     public async Task<IActionResult> Me()
     {
-        if (User?.Identity?.IsAuthenticated != true) return Unauthorized();
+        if (User?.Identity?.IsAuthenticated != true) return Unauthorized(new { message = "No autenticado." });
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
+        if (user == null) return Unauthorized(new { message = "No autenticado." });
         return Ok(await ToDtoAsync(user));
     }
 
@@ -60,6 +60,7 @@ public class AuthController : ControllerBase
             Apellido = user.Apellido,
             Avatar = user.Avatar,
             Tema = user.Tema,
+            Paleta = user.Paleta,
             Roles = roles.ToList()
         };
     }

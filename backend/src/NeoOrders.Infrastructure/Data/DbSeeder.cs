@@ -90,8 +90,8 @@ public static class DbSeeder
                 var cantidad = rnd.Next(1, 4);
                 var fecha = DateTime.UtcNow.AddDays(-rnd.Next(0, 180));
                 var estado = estados[rnd.Next(estados.Length)];
-                if (i % 7 == 0) estado = "Entregado";
-                if (i % 11 == 0) estado = "Pendiente";
+                if (i % 7 == 0) estado = OrderStatuses.Entregado;
+                if (i % 11 == 0) estado = OrderStatuses.Pendiente;
                 pedidos.Add(new Order
                 {
                     ClientId = cliente.Id,

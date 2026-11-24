@@ -30,7 +30,7 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Get(int id)
     {
         var p = await _orderQuery.GetByIdAsync(id);
-        if (p == null) return NotFound();
+        if (p == null) return NotFound(new { message = "Pedido no encontrado." });
         return Ok(p);
     }
 
@@ -46,7 +46,7 @@ public class OrdersController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateOrderDto dto)
     {
-        if (id != dto.Id) return BadRequest();
+        if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
         if (!ModelState.IsValid) return BadRequest(ModelState);
         var current = await _orderQuery.GetEstadoAsync(id);
         if (current != null && OrderStatuses.EditLocked.Contains(current))
@@ -77,7 +77,7 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var ok = await _orderService.DeleteAsync(id);
-        if (!ok) return NotFound();
+        if (!ok) return NotFound(new { message = "Pedido no encontrado." });
         return NoContent();
     }
 

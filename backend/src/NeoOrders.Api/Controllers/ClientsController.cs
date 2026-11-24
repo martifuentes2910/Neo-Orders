@@ -22,7 +22,7 @@ public class ClientsController : ControllerBase
     public async Task<IActionResult> Get(int id)
     {
         var c = await _clients.GetByIdAsync(id);
-        if (c == null) return NotFound();
+        if (c == null) return NotFound(new { message = "Cliente no encontrado." });
         return Ok(c);
     }
 
@@ -31,19 +31,33 @@ public class ClientsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] ClientDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var created = await _clients.CreateAsync(dto);
-        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+        try
+        {
+            var created = await _clients.CreateAsync(dto);
+            return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] ClientDto dto)
     {
-        if (id != dto.Id) return BadRequest();
+        if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        var ok = await _clients.UpdateAsync(id, dto);
-        if (!ok) return NotFound();
-        return NoContent();
+        try
+        {
+            var ok = await _clients.UpdateAsync(id, dto);
+            if (!ok) return NotFound(new { message = "Cliente no encontrado." });
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id:int}")]
@@ -51,7 +65,7 @@ public class ClientsController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var (ok, error) = await _clients.DeleteAsync(id);
-        if (!ok && error == "NOT_FOUND") return NotFound();
+        if (!ok && error == "NOT_FOUND") return NotFound(new { message = "Cliente no encontrado." });
         if (!ok) return BadRequest(new { message = error });
         return NoContent();
     }

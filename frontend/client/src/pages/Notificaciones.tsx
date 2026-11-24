@@ -1,54 +1,20 @@
-import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, CheckCheck, Package, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useNotifications } from '../context/NotificationsContext';
 import { NotificationRow, NotificationsEmpty } from '@/components/NotificationsList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { FILTERS, MODULES, useNotificationsFeed } from '@/features/notifications';
 import type { NotificationKind } from '../types';
 
-const FILTERS = [
-  { id: 'todas', label: 'Todas' },
-  { id: 'no-leidas', label: 'No leídas' },
-  { id: 'altas', label: 'Altas' },
-  { id: 'cambios', label: 'Cambios' },
-  { id: 'bajas', label: 'Bajas' },
-] as const;
-
-type FilterId = (typeof FILTERS)[number]['id'];
-
-const ACTION_BY_FILTER: Record<string, string> = {
-  altas: 'creado',
-  cambios: 'actualizado',
-  bajas: 'eliminado',
-};
-
-const MODULES: { value: NotificationKind | 'todos'; label: string }[] = [
-  { value: 'todos', label: 'Todos los módulos' },
-  { value: 'cliente', label: 'Clientes' },
-  { value: 'pedido', label: 'Pedidos' },
-  { value: 'producto', label: 'Productos' },
-  { value: 'vendedor', label: 'Vendedores' },
-  { value: 'usuario', label: 'Usuarios' },
-];
-
+/** Página de Notificaciones: el feed y sus filtros viven en `useNotificationsFeed`. */
 export default function Notificaciones() {
-  const { items, summary, loading, isRead, markRead, markAllRead, unreadCount } = useNotifications();
-  const [filter, setFilter] = useState<FilterId>('todas');
-  const [modulo, setModulo] = useState<NotificationKind | 'todos'>('todos');
-
-  const filtered = useMemo(() => {
-    return items.filter((n) => {
-      if (modulo !== 'todos' && n.tipo !== modulo) return false;
-      if (filter === 'no-leidas') return !isRead(n.id);
-      const action = ACTION_BY_FILTER[filter];
-      if (action) return n.accion === action;
-      return true;
-    });
-  }, [items, filter, modulo, isRead]);
+  const {
+    items, summary, loading, isRead, markRead, markAllRead, unreadCount,
+    filter, setFilter, modulo, setModulo, filtered,
+  } = useNotificationsFeed();
 
   return (
     <div className="w-full space-y-6">

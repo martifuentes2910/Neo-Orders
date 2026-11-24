@@ -32,21 +32,24 @@ public class ConfiguracionController : ControllerBase
     public async Task<IActionResult> GetPerfil()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema });
+        if (user == null) return Unauthorized(new { message = "No autenticado." });
+        var roles = await _userManager.GetRolesAsync(user);
+        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta, Roles = roles.ToList() });
     }
 
     [HttpPut("profile")]
     public async Task<IActionResult> UpdatePerfil([FromBody] PerfilDto dto)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-        user.Nombre = dto.Nombre;
-        user.Apellido = dto.Apellido;
-        user.Avatar = dto.Avatar;
-        user.Tema = dto.Tema;
+        if (user == null) return Unauthorized(new { message = "No autenticado." });
+        if (!string.IsNullOrWhiteSpace(dto.Nombre)) user.Nombre = dto.Nombre;
+        if (!string.IsNullOrWhiteSpace(dto.Apellido)) user.Apellido = dto.Apellido;
+        if (!string.IsNullOrWhiteSpace(dto.Avatar)) user.Avatar = dto.Avatar;
+        if (!string.IsNullOrWhiteSpace(dto.Tema)) user.Tema = dto.Tema;
+        if (!string.IsNullOrWhiteSpace(dto.Paleta)) user.Paleta = dto.Paleta;
         await _userManager.UpdateAsync(user);
-        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema });
+        var roles = await _userManager.GetRolesAsync(user);
+        return Ok(new { user.Id, user.Email, user.Nombre, user.Apellido, user.Avatar, user.Tema, user.Paleta, Roles = roles.ToList() });
     }
 
     [HttpPost("seed")]
@@ -55,5 +58,13 @@ public class ConfiguracionController : ControllerBase
     {
         await _config.SeedAsync(HttpContext.RequestServices);
         return Ok(new { message = "Datos de ejemplo verificados/cargados" });
+    }
+
+    [HttpPost("clear")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Clear()
+    {
+        var result = await _config.ClearAsync();
+        return Ok(result);
     }
 }

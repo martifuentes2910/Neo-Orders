@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '../api';
+import { configFeatureApi } from '../features/config/api';
 import { useAuth } from './AuthContext';
 import type { PaletteId } from '../types';
 
@@ -82,12 +82,12 @@ export function ThemeProvider({ children, initialMode }: { children: ReactNode; 
   const setMode = (next: Mode) => {
     explicitChoice.current = true;
     setModeState(next);
-    if (user) api.config.perfil.update({ tema: next }).catch(() => {});
+    if (user) configFeatureApi.perfil.update({ tema: next }).catch(() => {});
   };
 
   const setPalette = (next: PaletteId) => {
     setPaletteState(next);
-    if (user) api.config.perfil.update({ paleta: next }).catch(() => {});
+    if (user) configFeatureApi.perfil.update({ paleta: next }).catch(() => {});
   };
 
   const toggle = () => setMode(resolved === 'oscuro' ? 'claro' : 'oscuro');

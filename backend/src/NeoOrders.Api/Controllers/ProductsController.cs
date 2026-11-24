@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NeoOrders.Infrastructure.Data;
-using NeoOrders.Infrastructure.Models;
-using NeoOrders.Application.Contracts.Orders;
-using NeoOrders.Application.Contracts.Notifications;
 using NeoOrders.Application.Contracts.Import;
+using NeoOrders.Application.Contracts.Products;
+using NeoOrders.Application.DTOs.Productos;
+using NeoOrders.Application.DTOs.Products;
 
 namespace NeoOrders.Api.Controllers;
 
@@ -14,79 +12,102 @@ namespace NeoOrders.Api.Controllers;
 [Authorize]
 public class ProductsController : ControllerBase
 {
-    private readonly AppDbContext _db;
+    private readonly IProductService _products;
     private readonly ICsvImportService _csvImport;
-    public ProductsController(AppDbContext db, ICsvImportService csvImport) { _db = db; _csvImport = csvImport; }
+    public ProductsController(IProductService products, ICsvImportService csvImport) { _products = products; _csvImport = csvImport; }
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? category, [FromQuery] bool? onlyInStock)
-    {
-        var q = _db.Products.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.Trim().ToLower();
-            q = q.Where(p => p.Name.ToLower().Contains(s) || p.Sku.ToLower().Contains(s));
-        }
-        if (!string.IsNullOrWhiteSpace(category) && category != "Todos")
-            q = q.Where(p => p.Category == category);
-        if (onlyInStock == true)
-            q = q.Where(p => p.Stock > 0);
-        return Ok(await q.OrderBy(p => p.Name).ToListAsync());
-    }
+        => Ok(await _products.ListAsync(search, category, onlyInStock));
 
     [HttpGet("categories")]
-    public async Task<IActionResult> Categories()
-    {
-        var cats = await _db.Products.Select(p => p.Category).Distinct().OrderBy(c => c).ToListAsync();
-        return Ok(cats);
-    }
+    public async Task<IActionResult> Categories() => Ok(await _products.CategoriesAsync());
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
     {
-        var p = await _db.Products.FindAsync(id);
-        if (p == null) return NotFound();
+        var p = await _products.GetByIdAsync(id);
+        if (p == null) return NotFound(new { message = "Producto no encontrado." });
         return Ok(p);
     }
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Create([FromBody] Product dto)
+    public async Task<IActionResult> Create([FromBody] ProductDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        _db.Products.Add(dto);
-        await _db.SaveChangesAsync();
-        return CreatedAtAction(nameof(Get), new { id = dto.Id }, dto);
+        try
+        {
+            var created = await _products.CreateAsync(dto);
+            return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update(int id, [FromBody] Product dto)
+    public async Task<IActionResult> Update(int id, [FromBody] ProductDto dto)
     {
-        if (id != dto.Id) return BadRequest();
-        var existing = await _db.Products.FindAsync(id);
-        if (existing == null) return NotFound();
-        existing.Sku = dto.Sku;
-        existing.Name = dto.Name;
-        existing.Category = dto.Category;
-        existing.BasePrice = dto.BasePrice;
-        existing.Cost = dto.Cost;
-        existing.Stock = dto.Stock;
-        existing.MinStockAlert = dto.MinStockAlert;
-        existing.Active = dto.Active;
-        await _db.SaveChangesAsync();
-        return NoContent();
+        if (id != dto.Id) return BadRequest(new { message = "El ID de la ruta no coincide con el cuerpo." });
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        try
+        {
+            var ok = await _products.UpdateAsync(id, dto);
+            if (!ok) return NotFound(new { message = "Producto no encontrado." });
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
-        var p = await _db.Products.FindAsync(id);
-        if (p == null) return NotFound();
-        _db.Products.Remove(p);
-        await _db.SaveChangesAsync();
+        var ok = await _products.DeleteAsync(id);
+        if (!ok) return NotFound(new { message = "Producto no encontrado." });
         return NoContent();
+    }
+
+    [HttpPost("{id:int}/image")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UploadImage(int id, IFormFile file, CancellationToken ct)
+    {
+        if (file == null) return BadRequest(new { message = "Debe seleccionar una imagen." });
+        await using var ms = new MemoryStream();
+        await file.CopyToAsync(ms, ct);
+        var (ok, error, imageUrl) = await _products.UploadImageAsync(id, ms.ToArray(), file.FileName, file.ContentType, ct);
+        if (!ok && error == "NOT_FOUND") return NotFound(new { message = "Producto no encontrado." });
+        if (!ok) return BadRequest(new { message = error });
+        return Ok(new { imageUrl });
+    }
+
+    [HttpDelete("{id:int}/image")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> RemoveImage(int id, CancellationToken ct)
+    {
+        var (ok, error) = await _products.RemoveImageAsync(id, ct);
+        if (!ok && error == "NOT_FOUND") return NotFound(new { message = "Producto no encontrado." });
+        if (!ok) return BadRequest(new { message = error });
+        return NoContent();
+    }
+
+    [HttpPost("price-adjustment/preview")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> PreviewPriceAdjustment([FromBody] PriceAdjustmentRequest dto)
+        => Ok(await _products.PreviewPriceAdjustmentAsync(dto.Percent));
+
+    [HttpPost("price-adjustment/apply")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ApplyPriceAdjustment([FromBody] PriceAdjustmentRequest dto)
+    {
+        try { return Ok(await _products.ApplyPriceAdjustmentAsync(dto.Percent)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
     }
 
     [HttpGet("import-csv/template")]

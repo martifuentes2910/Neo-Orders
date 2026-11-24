@@ -1,9 +1,10 @@
-using NeoOrders.Application.Contracts.Orders;
-using NeoOrders.Application.Contracts.Notifications;
-using NeoOrders.Application.Contracts.Import;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using NeoOrders.Application.Contracts.Notifications;
+using NeoOrders.Application.DTOs.Notifications;
+using NeoOrders.Domain.Orders;
 using NeoOrders.Infrastructure.Data;
 using NeoOrders.Infrastructure.Models;
 
@@ -67,5 +68,48 @@ public class NotificationService : INotificationService
         {
             _logger.LogWarning(ex, "No se pudo registrar la notificación: {Titulo}", titulo);
         }
+    }
+
+
+    public async Task<NotificationsResponseDto> GetRecentAsync(int take = 60)
+    {
+        take = Math.Clamp(take <= 0 ? 60 : take, 1, 200);
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+
+        var items = await _db.Notifications
+            .AsNoTracking()
+            .OrderByDescending(n => n.Fecha)
+            .Take(take)
+            .Select(n => new NotificationDto
+            {
+                Id = n.Id,
+                Tipo = n.Tipo,
+                Accion = n.Accion,
+                Titulo = n.Titulo,
+                Mensaje = n.Mensaje,
+                Link = n.Link,
+                Usuario = n.Usuario,
+                Fecha = n.Fecha,
+                EntidadId = n.EntidadId
+            })
+            .ToListAsync();
+
+        var stockCritico = await _db.Products.AsNoTracking()
+            .CountAsync(p => p.Active && p.Stock <= p.MinStockAlert);
+        var pendientes = await _db.Orders.AsNoTracking()
+            .CountAsync(o => o.Estado == OrderStatuses.Pendiente);
+
+        return new NotificationsResponseDto
+        {
+            Items = items,
+            Resumen = new NotificationsSummaryDto
+            {
+                Total = items.Count,
+                Hoy = items.Count(n => n.Fecha >= today && n.Fecha < tomorrow),
+                StockCritico = stockCritico,
+                Pendientes = pendientes
+            }
+        };
     }
 }

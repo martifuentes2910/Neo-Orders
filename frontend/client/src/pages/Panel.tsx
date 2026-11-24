@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useChartTheme } from '../hooks/useChartTheme';
-import { api } from '../api';
+import { useDashboardMetrics } from '@/features/dashboard';
 import { getStatusColor, getStatusTextColor, type OrderStatus } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -21,7 +21,7 @@ import { GRAD } from '@/lib/chartGradients';
 
 import ChartTooltip from '@/components/ChartTooltip';
 import { compactNumber } from '@/lib/format';
-import type { DashboardMetricsResponse, PedidoReciente, SerieMensual, TopProducto } from '../types/reportes';
+import type { PedidoReciente, SerieMensual, TopProducto } from '../types/reportes';
 
 function AnimatedNumber({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
@@ -50,8 +50,7 @@ export default function Panel() {
   const { resolved, palette } = useTheme();
   const isDark = resolved === 'oscuro';
   const reduceMotion = useReducedMotion();
-  const [metrics, setMetrics] = useState<DashboardMetricsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { metrics, loading } = useDashboardMetrics();
 
   const recientes: PedidoReciente[] = metrics?.recientes ?? [];
   const { sorted: recentSorted, sort, toggle } = useTableSort(recientes, {
@@ -62,14 +61,6 @@ export default function Panel() {
     fecha: (r: PedidoReciente) => new Date(r.fecha).getTime(),
     estado: (r: PedidoReciente) => ['Pendiente', 'Procesado', 'Enviado', 'Entregado', 'Cancelado'].indexOf(r.estado),
   });
-
-  useEffect(() => {
-    api.dashboard
-      .metricas()
-      .then(setMetrics)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   if (loading) return <div className="flex items-center justify-center py-20 text-muted-foreground">Cargando panel…</div>;
   if (!metrics) return <div className="py-20 text-center text-muted-foreground">No se pudieron cargar las métricas.</div>;

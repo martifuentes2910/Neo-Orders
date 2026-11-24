@@ -62,7 +62,11 @@ public class UsuariosController : ControllerBase
             EmailConfirmed = true
         };
         var result = await _userManager.CreateAsync(user, dto.Password);
-        if (!result.Succeeded) return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToArray();
+            return BadRequest(new { message = string.Join(" ", errors), errors });
+        }
         await _userManager.AddToRoleAsync(user, dto.Rol);
         return Ok(new { user.Id, user.Email });
     }
@@ -71,7 +75,11 @@ public class UsuariosController : ControllerBase
     public async Task<IActionResult> SetRol(string id, [FromBody] RolDto dto)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user == null) return NotFound();
+        if (user == null) return NotFound(new { message = "Usuario no encontrado." });
+        // Sin esta guardia se removían todos los roles y AddToRoleAsync fallaba
+        // silenciosamente, dejando al usuario sin ningún rol (KAN-41).
+        if (string.IsNullOrWhiteSpace(dto.Rol) || !await _roleManager.RoleExistsAsync(dto.Rol))
+            return BadRequest(new { message = "Rol no válido." });
         var roles = await _userManager.GetRolesAsync(user);
         await _userManager.RemoveFromRolesAsync(user, roles);
         await _userManager.AddToRoleAsync(user, dto.Rol);
@@ -82,7 +90,7 @@ public class UsuariosController : ControllerBase
     public async Task<IActionResult> Delete(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user == null) return NotFound();
+        if (user == null) return NotFound(new { message = "Usuario no encontrado." });
         // prevent deleting self? optional
         await _userManager.DeleteAsync(user);
         return NoContent();

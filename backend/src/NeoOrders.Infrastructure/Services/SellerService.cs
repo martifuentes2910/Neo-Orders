@@ -11,6 +11,10 @@ public class SellerService : ISellerService
     private readonly AppDbContext _db;
     public SellerService(AppDbContext db) => _db = db;
 
+    private static bool IsUniqueConstraint(DbUpdateException ex)
+        => ex.InnerException?.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) == true
+           || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true;
+
     public async Task<List<SellerDto>> ListAsync(bool? onlyActive)
     {
         var q = _db.Sellers.AsNoTracking().AsQueryable();
@@ -28,10 +32,19 @@ public class SellerService : ISellerService
 
     public async Task<SellerDto> CreateAsync(SellerDto dto)
     {
-        var entity = new Seller { Name = dto.Name, Email = dto.Email, Phone = dto.Phone, CommissionPercentage = dto.CommissionPercentage, Active = dto.Active };
+        var email = dto.Email.Trim().ToLowerInvariant();
+        var entity = new Seller { Name = dto.Name, Email = email, Phone = dto.Phone, CommissionPercentage = dto.CommissionPercentage, Active = dto.Active };
         _db.Sellers.Add(entity);
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraint(ex))
+        {
+            throw new InvalidOperationException("Ya existe un vendedor con ese email.");
+        }
         dto.Id = entity.Id;
+        dto.Email = email;
         return dto;
     }
 
@@ -39,9 +52,16 @@ public class SellerService : ISellerService
     {
         var existing = await _db.Sellers.FindAsync(id);
         if (existing == null) return false;
-        existing.Name = dto.Name; existing.Email = dto.Email; existing.Phone = dto.Phone;
+        existing.Name = dto.Name; existing.Email = dto.Email.Trim().ToLowerInvariant(); existing.Phone = dto.Phone;
         existing.CommissionPercentage = dto.CommissionPercentage; existing.Active = dto.Active;
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraint(ex))
+        {
+            throw new InvalidOperationException("Ya existe un vendedor con ese email.");
+        }
         return true;
     }
 

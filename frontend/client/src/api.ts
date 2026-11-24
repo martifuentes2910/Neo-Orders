@@ -1,160 +1,43 @@
 import type {
-  ClientesComprasResponse,
-  DashboardMetricsResponse,
-  FiltrosReporteParams,
-  ProductosVendidosResponse,
-  ReporteResumenResponse,
-  VentasVendedorResponse,
-} from './types/reportes';
+  Client,
+  CompanySettings,
+  Order,
+  Product,
+  Seller,
+  User,
+} from './types';
+import type { FiltrosReporteParams } from './types/reportes';
+import { BASE } from './api/http';
+import { dashboardApi, reportsApi } from './api/reports';
+import { authApi } from './api/auth';
+import { clientsApi } from './api/clients';
+import { ordersApi } from './api/orders';
+import { productsApi } from './api/products';
+import { sellersApi } from './api/sellers';
+import { notificationsApi } from './api/notifications';
+import { configApi } from './api/config';
+import { usersApi } from './api/users';
 
-export interface PriceAdjustmentItem {
-  id: number;
-  sku: string;
-  name: string;
-  currentBasePrice: number;
-  newBasePrice: number;
-}
-
-export interface PriceAdjustmentPreviewResponse {
-  percent: number;
-  factor: number;
-  affectedCount: number;
-  skippedInactiveCount: number;
-  items: PriceAdjustmentItem[];
-  errors: string[];
-}
-
-export interface PriceAdjustmentApplyResponse {
-  affectedCount: number;
-  percent: number;
-  factor: number;
-  appliedAtUtc: string;
-}
-
-export interface CsvImportError {
-  row: number;
-  field: string;
-  value: string;
-  message: string;
-}
-
-export interface CsvImportResult {
-  totalRows: number;
-  validRows: number;
-  imported: number;
-  errors: CsvImportError[];
-}
-
-const BASE =
-  (import.meta as any).env?.VITE_API_URL ||
-  (typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:5286/api`
-    : 'http://localhost:5286/api');
-
-let csrfToken: string | null = null;
-
-async function fetchCsrfToken(): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE.replace('/api', '')}/api/antiforgery/token`, {
-      credentials: 'include',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    csrfToken = data.token;
-    return csrfToken;
-  } catch {
-    return null;
-  }
-}
-
-async function ensureCsrf(): Promise<string | null> {
-  if (csrfToken) return csrfToken;
-  return fetchCsrfToken();
-}
-
-async function handle<T>(res: Response): Promise<T> {
-  if (res.status === 401) {
-    throw new Error('UNAUTHORIZED');
-  }
-  if (!res.ok) {
-    let message = `Error ${res.status}`;
-    let body: any = null;
-    try {
-      body = await res.json();
-      if (body?.message) message = body.message;
-      else if (Array.isArray(body?.errors) && body.errors[0]?.row) message = 'El archivo contiene errores de validación.';
-      else if (body?.errors) message = Object.values(body.errors).flat().join(' ');
-      else if (body?.title) message = body.title;
-    } catch {
-      /* ignore */
-    }
-    const err: any = new Error(message);
-    if (body) err.body = body;
-    throw err;
-  }
-  if (res.status === 204) return undefined as T;
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return res.json();
-  return undefined as T;
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const method = (options.method || 'GET').toUpperCase();
-  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  const headers: Record<string, string> = {
-    // KAN-23: con FormData el navegador debe fijar el boundary del multipart.
-    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-    ...(options.headers as Record<string, string>),
-  };
-  if (method !== 'GET' && method !== 'HEAD') {
-    const t = await ensureCsrf();
-    if (t) headers['X-XSRF-TOKEN'] = t;
-  }
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
-  if (res.status === 400 && method !== 'GET') {
-    csrfToken = null;
-    const t = await fetchCsrfToken();
-    if (t) headers['X-XSRF-TOKEN'] = t;
-    const res2 = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
-    return handle<T>(res2);
-  }
-  return handle<T>(res);
-}
-
-function buildReporteQuery(filtros?: FiltrosReporteParams): string {
-  const params = new URLSearchParams();
-  if (filtros?.desde) params.set('desde', filtros.desde);
-  if (filtros?.hasta) params.set('hasta', filtros.hasta);
-  if (filtros?.clientId) params.set('clientId', String(filtros.clientId));
-  if (filtros?.sellerId) params.set('sellerId', String(filtros.sellerId));
-  if (filtros?.estado && filtros.estado !== 'Todos') params.set('estado', filtros.estado);
-  if (filtros?.page && filtros.page !== 1) params.set('page', String(filtros.page));
-  if (filtros?.pageSize && filtros.pageSize !== 25) params.set('pageSize', String(filtros.pageSize));
-  const qs = params.toString();
-  return qs ? `?${qs}` : '';
-}
+export type {
+  CsvImportError,
+  CsvImportResult,
+  PriceAdjustmentItem,
+  PriceAdjustmentPreviewResponse,
+  PriceAdjustmentApplyResponse,
+} from './types';
 
 export const api = {
-  login: (email: string, password: string) =>
-    request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  logout: () => request<void>('/auth/logout', { method: 'POST' }),
-  me: () => request<any>('/auth/me'),
+  login: (email: string, password: string) => authApi.login(email, password),
+  logout: () => authApi.logout(),
+  me: () => authApi.me(),
 
   clients: {
-    list: (search?: string) => request<any[]>(`/clients${search ? '?search=' + encodeURIComponent(search) : ''}`),
-    create: (data: any) => request<any>('/clients', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    remove: (id: number) => request<void>(`/clients/${id}`, { method: 'DELETE' }),
+    list: (search?: string) => clientsApi.list(search),
+    create: (data: Partial<Client>) => clientsApi.create(data),
+    update: (id: number, data: Partial<Client>) => clientsApi.update(id, data),
+    remove: (id: number) => clientsApi.remove(id),
     templateUrl: () => `${BASE}/clients/import-csv/template`,
-    importCsv: (file: File) => {
-      const body = new FormData();
-      body.append('file', file);
-      return request<CsvImportResult>('/clients/import-csv', { method: 'POST', body });
-    },
+    importCsv: (file: File) => clientsApi.importCsv(file),
   },
 
   orders: {
@@ -165,115 +48,87 @@ export const api = {
       sellerId?: number,
       productId?: number,
       desde?: string,
-      hasta?: string
-    ) => {
-      const params = new URLSearchParams();
-      if (search) params.set('search', search);
-      if (estado && estado !== 'Todos') params.set('estado', estado);
-      if (clientId) params.set('clientId', String(clientId));
-      if (sellerId) params.set('sellerId', String(sellerId));
-      if (productId) params.set('productId', String(productId));
-      if (desde) params.set('desde', desde);
-      if (hasta) params.set('hasta', hasta);
-      const qs = params.toString();
-      return request<any[]>(`/orders${qs ? '?' + qs : ''}`);
-    },
-    create: (data: any) => request<any>('/orders', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      hasta?: string,
+    ) => ordersApi.list(search, estado, clientId, sellerId, productId, desde, hasta),
+    create: (
+      data: Pick<Order, 'clientId' | 'cantidad'> & {
+        sellerId?: number | null;
+        productId?: number | null;
+        productName?: string;
+        precioUnitario?: number;
+        orderNumber?: string | null;
+      },
+    ) => ordersApi.create(data),
+    update: (
+      id: number,
+      data: Pick<Order, 'id' | 'clientId' | 'cantidad' | 'estado'> & {
+        sellerId?: number | null;
+        productId?: number | null;
+        productName?: string;
+        precioUnitario?: number;
+      },
+    ) => ordersApi.update(id, data),
     // KAN-16: único camino permitido para cambiar el estado de pedidos Enviado/Entregado/Cancelado.
-    updateStatus: (id: number, estado: string) => request<void>(`/orders/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
-    remove: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
+    updateStatus: (id: number, estado: string) => ordersApi.updateStatus(id, estado),
+    remove: (id: number) => ordersApi.remove(id),
     templateUrl: () => `${BASE}/orders/import-csv/template`,
-    importCsv: (file: File) => {
-      const body = new FormData();
-      body.append('file', file);
-      return request<CsvImportResult>('/orders/import-csv', { method: 'POST', body });
-    },
+    importCsv: (file: File) => ordersApi.importCsv(file),
   },
 
   products: {
-    list: (search?: string, category?: string, onlyInStock?: boolean, sku?: string, nombre?: string) => {
-      const params = new URLSearchParams();
-      if (search) params.set('search', search);
-      if (category && category !== 'Todos') params.set('category', category);
-      if (onlyInStock) params.set('onlyInStock', 'true');
-      if (sku) params.set('sku', sku);
-      if (nombre) params.set('nombre', nombre);
-      const qs = params.toString();
-      return request<any[]>(`/products${qs ? '?' + qs : ''}`);
-    },
-    categories: () => request<string[]>('/products/categories'),
-    create: (data: any) => request<any>('/products', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    list: (search?: string, category?: string, onlyInStock?: boolean, sku?: string, nombre?: string) =>
+      productsApi.list(search, category, onlyInStock, sku, nombre),
+    categories: () => productsApi.categories(),
+    create: (data: Partial<Product>) => productsApi.create(data),
+    update: (id: number, data: Partial<Product>) => productsApi.update(id, data),
     // KAN-23: la imagen se sube en un endpoint dedicado para no cambiar el contrato JSON.
-    uploadImage: (id: number, file: File) => {
-      const body = new FormData();
-      body.append('file', file);
-      return request<{ imageUrl: string }>(`/products/${id}/image`, { method: 'POST', body });
-    },
-    removeImage: (id: number) => request<void>(`/products/${id}/image`, { method: 'DELETE' }),
-    previewPriceAdjustment: (percent: number) =>
-      request<PriceAdjustmentPreviewResponse>('/products/price-adjustment/preview', {
-        method: 'POST',
-        body: JSON.stringify({ percent }),
-      }),
-    applyPriceAdjustment: (percent: number) =>
-      request<PriceAdjustmentApplyResponse>('/products/price-adjustment/apply', {
-        method: 'POST',
-        body: JSON.stringify({ percent }),
-      }),
-    remove: (id: number) => request<void>(`/products/${id}`, { method: 'DELETE' }),
+    uploadImage: (id: number, file: File) => productsApi.uploadImage(id, file),
+    removeImage: (id: number) => productsApi.removeImage(id),
+    previewPriceAdjustment: (percent: number) => productsApi.previewPriceAdjustment(percent),
+    applyPriceAdjustment: (percent: number) => productsApi.applyPriceAdjustment(percent),
+    remove: (id: number) => productsApi.remove(id),
     templateUrl: () => `${BASE}/products/import-csv/template`,
-    importCsv: (file: File) => {
-      const body = new FormData();
-      body.append('file', file);
-      return request<CsvImportResult>('/products/import-csv', { method: 'POST', body });
-    },
+    importCsv: (file: File) => productsApi.importCsv(file),
   },
 
   sellers: {
-    list: (onlyActive?: boolean) => request<any[]>(`/sellers${onlyActive ? '?onlyActive=true' : ''}`),
-    create: (data: any) => request<any>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => request<void>(`/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    remove: (id: number) => request<void>(`/sellers/${id}`, { method: 'DELETE' }),
+    list: (onlyActive?: boolean) => sellersApi.list(onlyActive),
+    create: (data: Partial<Seller>) => sellersApi.create(data),
+    update: (id: number, data: Partial<Seller>) => sellersApi.update(id, data),
+    remove: (id: number) => sellersApi.remove(id),
   },
 
-  dashboard: {
-    metricas: () => request<DashboardMetricsResponse>('/dashboard/metrics'),
-  },
+  dashboard: dashboardApi,
 
   notifications: {
-    list: (take = 60) => request<any>(`/notifications?take=${take}`),
+    list: (take = 60) => notificationsApi.list(take),
   },
 
-  reports: (filtros?: FiltrosReporteParams) =>
-    request<ReporteResumenResponse>(`/reports${buildReporteQuery(filtros)}`),
+  reports: (filtros?: FiltrosReporteParams) => reportsApi.resumen(filtros),
 
   reportesDetalle: {
-    vendedores: (filtros?: FiltrosReporteParams) =>
-      request<VentasVendedorResponse>(`/reports/detalle/vendedores${buildReporteQuery(filtros)}`),
-    productos: (filtros?: FiltrosReporteParams) =>
-      request<ProductosVendidosResponse>(`/reports/detalle/productos${buildReporteQuery(filtros)}`),
-    clientes: (filtros?: FiltrosReporteParams) =>
-      request<ClientesComprasResponse>(`/reports/detalle/clientes${buildReporteQuery(filtros)}`),
+    vendedores: (filtros?: FiltrosReporteParams) => reportsApi.detalle.vendedores(filtros),
+    productos: (filtros?: FiltrosReporteParams) => reportsApi.detalle.productos(filtros),
+    clientes: (filtros?: FiltrosReporteParams) => reportsApi.detalle.clientes(filtros),
   },
 
   config: {
     empresa: {
-      get: () => request<any>('/config/company'),
-      update: (data: any) => request<any>('/config/company', { method: 'PUT', body: JSON.stringify(data) }),
+      get: () => configApi.empresa.get(),
+      update: (data: Partial<CompanySettings>) => configApi.empresa.update(data),
     },
     perfil: {
-      get: () => request<any>('/config/profile'),
-      update: (data: any) => request<any>('/config/profile', { method: 'PUT', body: JSON.stringify(data) }),
+      get: () => configApi.perfil.get(),
+      update: (data: Partial<User>) => configApi.perfil.update(data),
     },
-    seed: () => request<any>('/config/seed', { method: 'POST' }),
-    clear: () => request<any>('/config/clear', { method: 'POST' }),
+    seed: () => configApi.seed(),
+    clear: () => configApi.clear(),
   },
 
   users: {
-    list: () => request<any[]>('/users'),
-    create: (data: any) => request<any>('/users', { method: 'POST', body: JSON.stringify(data) }),
-    remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
+    list: () => usersApi.list(),
+    create: (data: { nombre: string; apellido: string; email: string; password: string; rol: string; avatar?: string }) =>
+      usersApi.create(data),
+    remove: (id: string) => usersApi.remove(id),
   },
 };

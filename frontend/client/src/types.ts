@@ -19,7 +19,7 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   Cancelado: [],
 };
 
-// KAN-16/KAN-35: estados con datos fijos; sólo se permite cambiar el estado.
+// KAN-16/KAN-35: estados con datos fijos; solo se permite cambiar el estado.
 export const ORDER_EDIT_LOCKED: OrderStatus[] = ['Procesado', 'Enviado', 'Entregado', 'Cancelado'];
 
 export const esEstadoBloqueado = (estado: OrderStatus): boolean => ORDER_EDIT_LOCKED.includes(estado);
@@ -164,4 +164,94 @@ export interface NotificationsSummary {
   hoy: number;
   stockCritico: number;
   pendientes: number;
+}
+
+export interface Client {
+  id: number;
+  nombre: string;
+  email: string;
+  telefono?: string | null;
+  direccion?: string | null;
+  fechaAlta?: string;
+  ordersCount?: number;
+  totalSpent?: number;
+}
+
+export interface Seller {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  commissionPercentage: number;
+  active: boolean;
+}
+
+export interface Product {
+  id: number;
+  sku: string;
+  name: string;
+  category: string;
+  basePrice: number;
+  cost: number;
+  stock: number;
+  minStockAlert: number;
+  active: boolean;
+  createdAt?: string;
+  isCriticalStock?: boolean;
+  imageUrl?: string | null;
+}
+
+export interface Order {
+  id: number;
+  clientId: number;
+  clientName?: string;
+  clientEmail?: string;
+  sellerId?: number | null;
+  sellerName?: string;
+  productId?: number | null;
+  productName: string;
+  cantidad: number;
+  precioUnitario: number;
+  total: number;
+  fecha: string;
+  estado: OrderStatus;
+  orderNumber?: string | null;
+}
+
+export interface CsvImportError {
+  row: number;
+  field: string;
+  value: string;
+  message: string;
+}
+
+export interface CsvImportResult {
+  totalRows: number;
+  validRows: number;
+  imported: number;
+  errors: CsvImportError[];
+}
+
+export interface PriceAdjustmentItem {
+  id: number;
+  sku: string;
+  name: string;
+  currentBasePrice: number;
+  newBasePrice: number;
+}
+
+export interface PriceAdjustmentPreviewResponse {
+  percent: number;
+  factor: number;
+  affectedCount: number;
+  skippedInactiveCount: number;
+  items: PriceAdjustmentItem[];
+  errors: string[];
+}
+
+export interface PriceAdjustmentApplyResponse {
+  affectedCount: number;
+  percent: number;
+  factor: number;
+  appliedAtUtc: string;
 }
