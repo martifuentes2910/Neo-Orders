@@ -14,12 +14,34 @@ namespace NeoOrders.Api.Controllers;
 [Authorize(Roles = "Admin")]
 public class UsuariosController : ControllerBase
 {
+    private const string AdminRole = "Admin";
+    private const string EmployeeRole = "Empleado";
+    private static readonly string[] AllowedRoles = [AdminRole, EmployeeRole];
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     public UsuariosController(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+    }
+
+    /// <summary>
+    /// KAN-39: identifica al usuario autenticado para impedir operaciones sobre uno mismo.
+    /// </summary>
+    private bool IsSelf(string id) =>
+        string.Equals(_userManager.GetUserId(User), id, StringComparison.Ordinal);
+
+    /// <summary>
+    /// KAN-39: true cuando el usuario tiene el rol Admin y es el único en el sistema.
+    /// </summary>
+    private async Task<bool> IsOnlyAdminAsync(ApplicationUser user, IList<string>? currentRoles = null)
+    {
+        currentRoles ??= await _userManager.GetRolesAsync(user);
+        if (!currentRoles.Contains(AdminRole, StringComparer.Ordinal)) return false;
+
+        var admins = await _userManager.GetUsersInRoleAsync(AdminRole);
+        return admins.Count == 1 && string.Equals(admins[0].Id, user.Id, StringComparison.Ordinal);
     }
 
     [HttpGet]
@@ -77,9 +99,23 @@ public class UsuariosController : ControllerBase
         if (user == null) return NotFound(new { message = "Usuario no encontrado." });
         // Sin esta guardia se removían todos los roles y AddToRoleAsync fallaba
         // silenciosamente, dejando al usuario sin ningún rol (KAN-41).
-        if (string.IsNullOrWhiteSpace(dto.Rol) || !await _roleManager.RoleExistsAsync(dto.Rol))
+        // KAN-39: además, el rol debe ser uno de los definidos en el dominio.
+        if (string.IsNullOrWhiteSpace(dto.Rol) ||
+            !AllowedRoles.Contains(dto.Rol, StringComparer.Ordinal) ||
+            !await _roleManager.RoleExistsAsync(dto.Rol))
             return BadRequest(new { message = "Rol no válido." });
+
+        // KAN-39: el administrador no debe auto-modificarse el rol: los claims de
+        // la cookie siguen vigentes hasta el próximo login (autorización obsoleta).
+        if (IsSelf(id))
+            return BadRequest(new { message = "No puedes cambiar tu propio rol." });
+
         var roles = await _userManager.GetRolesAsync(user);
+        if (roles.Contains(AdminRole, StringComparer.Ordinal) &&
+            !string.Equals(dto.Rol, AdminRole, StringComparison.Ordinal) &&
+            await IsOnlyAdminAsync(user, roles))
+            return BadRequest(new { message = "No se puede quitar el rol de administrador al último administrador." });
+
         await _userManager.RemoveFromRolesAsync(user, roles);
         await _userManager.AddToRoleAsync(user, dto.Rol);
         return NoContent();
@@ -90,7 +126,15 @@ public class UsuariosController : ControllerBase
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound(new { message = "Usuario no encontrado." });
-        // prevent deleting self? optional
+
+        // KAN-39: no auto-eliminarse (la sesión quedaría con claims huérfanos) y
+        // no eliminar al último Admin (dejaría el sistema sin administradores).
+        if (IsSelf(id))
+            return BadRequest(new { message = "No puedes eliminar tu propio usuario." });
+
+        if (await IsOnlyAdminAsync(user))
+            return BadRequest(new { message = "No se puede eliminar al último administrador." });
+
         await _userManager.DeleteAsync(user);
         return NoContent();
     }

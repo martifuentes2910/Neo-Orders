@@ -266,9 +266,12 @@ function EmpresaTab({ company, update }: { company: CompanySettings | null; upda
 }
 
 function UsuariosTab() {
+  const { user: currentUser } = useAuth();
   const {
     users, loading, showForm, setShowForm, form, setForm, saving, sort, toggle, save, remove,
   } = useUsers();
+  // El backend rechaza auto-eliminarse y borrar al último Admin; reflejarlo en la UI.
+  const adminCount = users.filter((u) => u.roles?.includes('Admin')).length;
 
   return (
     <div className="space-y-6">
@@ -292,25 +295,42 @@ function UsuariosTab() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <span className="flex items-center gap-2">
-                      <UserAvatar avatar={u.avatar} size={28} />
-                      <span>{u.nombre} {u.apellido}</span>
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant="secondary">{u.roles?.join(', ')}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remove(u.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {users.map((u) => {
+                const isSelf = currentUser?.id === u.id;
+                const isLastAdmin = u.roles?.includes('Admin') && adminCount <= 1;
+                const deleteHint = isSelf
+                  ? 'No puedes eliminar tu propio usuario'
+                  : isLastAdmin
+                    ? 'No se puede eliminar al último administrador'
+                    : 'Eliminar usuario';
+                return (
+                  <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3">{u.email}</td>
+                    <td className="px-4 py-3">
+                      <span className="flex items-center gap-2">
+                        <UserAvatar avatar={u.avatar} size={28} />
+                        <span>{u.nombre} {u.apellido}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="secondary">{u.roles?.join(', ')}</Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive disabled:opacity-40"
+                        title={deleteHint}
+                        aria-label={deleteHint}
+                        disabled={isSelf || isLastAdmin}
+                        onClick={() => remove(u.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

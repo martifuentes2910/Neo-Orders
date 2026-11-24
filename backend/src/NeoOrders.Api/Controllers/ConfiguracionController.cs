@@ -42,6 +42,11 @@ public class ConfiguracionController : ControllerBase
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized(new { message = "No autenticado." });
+
+        // KAN-39: revisión de seguridad: el alcance es el propio usuario y el DTO
+        // sólo expone preferencias visibles, nunca email/password/roles. No hay
+        // escalada posible, por lo que se conserva el comportamiento (campos
+        // vacíos se ignoran) sin reforzar las validaciones del DTO.
         if (!string.IsNullOrWhiteSpace(dto.Nombre)) user.Nombre = dto.Nombre;
         if (!string.IsNullOrWhiteSpace(dto.Apellido)) user.Apellido = dto.Apellido;
         if (!string.IsNullOrWhiteSpace(dto.Avatar)) user.Avatar = dto.Avatar;

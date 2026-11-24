@@ -543,6 +543,243 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Contains("Empleado", GetProperty(usuario, "roles").EnumerateArray().Select(r => r.GetString()));
     }
 
+    /// <summary>
+    /// KAN-39: el usuario autenticado no puede eliminarse a sí mismo.
+    /// </summary>
+    [Fact]
+    public async Task DeleteUsers_AutoEliminacion_Retorna400ConMessageYConservaUsuario()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var id = $"delete-self-{suffix}";
+        var email = $"delete.self.{suffix}@test.local";
+        using var auth = _factory.CreateClientWithTestAuth(userId: id, roles: ["Admin"]);
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = id,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        }, "Admin");
+
+        var response = await auth.Client.DeleteAsync($"/api/users/{id}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("No puedes eliminar tu propio usuario.", GetProperty(doc.RootElement, "message").GetString());
+
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        Assert.Contains(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "id").GetString() == id);
+    }
+
+    /// <summary>
+    /// KAN-39: no se puede eliminar al último administrador del sistema.
+    /// </summary>
+    [Fact]
+    public async Task DeleteUsers_UltimoAdmin_Retorna400ConMessageYConservaUsuario()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var id = $"delete-last-admin-{suffix}";
+        var email = $"delete.last.admin.{suffix}@test.local";
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = id,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        }, "Admin");
+
+        var response = await auth.Client.DeleteAsync($"/api/users/{id}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("No se puede eliminar al último administrador.", GetProperty(doc.RootElement, "message").GetString());
+
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        Assert.Contains(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "id").GetString() == id);
+    }
+
+    /// <summary>
+    /// KAN-39: la guardia del último Admin no bloquea borrar un Admin cuando hay otro.
+    /// </summary>
+    [Fact]
+    public async Task DeleteUsers_ConOtroAdmin_PermiteEliminarAdmin()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var targetId = $"delete-admin-target-{suffix}";
+        var otherId = $"delete-admin-other-{suffix}";
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = targetId,
+            UserName = $"delete.admin.target.{suffix}@test.local",
+            Email = $"delete.admin.target.{suffix}@test.local",
+            EmailConfirmed = true
+        }, "Admin");
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = otherId,
+            UserName = $"delete.admin.other.{suffix}@test.local",
+            Email = $"delete.admin.other.{suffix}@test.local",
+            EmailConfirmed = true
+        }, "Admin");
+
+        var response = await auth.Client.DeleteAsync($"/api/users/{targetId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        var ids = usuariosDoc.RootElement.EnumerateArray()
+            .Select(u => GetProperty(u, "id").GetString()).ToList();
+        Assert.DoesNotContain(targetId, ids);
+        Assert.Contains(otherId, ids);
+    }
+
+    /// <summary>
+    /// KAN-39: un administrador no puede auto-modificarse el rol (los claims de la
+    /// cookie seguirían autorizando hasta el próximo login).
+    /// </summary>
+    [Fact]
+    public async Task PutUsersRol_AutoCambio_Retorna400ConMessageYConservaAdmin()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var id = $"rol-self-{suffix}";
+        var email = $"rol.self.{suffix}@test.local";
+        using var auth = _factory.CreateClientWithTestAuth(userId: id, roles: ["Admin"]);
+        await SeedRoleViaUserAsync(auth, "Empleado");
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = id,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        }, "Admin");
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/users/{id}/rol", new { rol = "Empleado" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("No puedes cambiar tu propio rol.", GetProperty(doc.RootElement, "message").GetString());
+
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        var usuario = Assert.Single(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "id").GetString() == id);
+        Assert.Contains("Admin", GetProperty(usuario, "roles").EnumerateArray().Select(r => r.GetString()));
+    }
+
+    /// <summary>
+    /// KAN-39: no se puede quitar el rol Admin al último administrador.
+    /// </summary>
+    [Fact]
+    public async Task PutUsersRol_QuitarAdminAlUltimoAdmin_Retorna400YConservaAdmin()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var id = $"rol-last-admin-{suffix}";
+        var email = $"rol.last.admin.{suffix}@test.local";
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await SeedRoleViaUserAsync(auth, "Empleado");
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = id,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        }, "Admin");
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/users/{id}/rol", new { rol = "Empleado" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("No se puede quitar el rol de administrador al último administrador.",
+            GetProperty(doc.RootElement, "message").GetString());
+
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        var usuario = Assert.Single(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "id").GetString() == id);
+        Assert.Contains("Admin", GetProperty(usuario, "roles").EnumerateArray().Select(r => r.GetString()));
+    }
+
+    /// <summary>
+    /// KAN-39: aunque el rol exista en Identity, sólo se aceptan los roles del dominio.
+    /// </summary>
+    [Fact]
+    public async Task PutUsersRol_RolFueraDelDominio_Retorna400YConservaRoles()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await SeedRoleViaUserAsync(auth, "SuperAdmin");
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var id = $"rol-out-of-domain-{suffix}";
+        var email = $"rol.out.domain.{suffix}@test.local";
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = id,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        }, "Empleado");
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/users/{id}/rol", new { rol = "SuperAdmin" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Rol no válido.", GetProperty(doc.RootElement, "message").GetString());
+
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        var usuario = Assert.Single(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "id").GetString() == id);
+        Assert.Contains("Empleado", GetProperty(usuario, "roles").EnumerateArray().Select(r => r.GetString()));
+    }
+
+    /// <summary>
+    /// KAN-39: UpdatePerfil sigue siendo exclusivamente de preferencias propias;
+    /// campos de seguridad enviados de más (email/password/roles) se ignoran.
+    /// </summary>
+    [Fact]
+    public async Task PutConfigProfile_CamposDeSeguridad_NoSeModifican()
+    {
+        const string userId = "config-no-escalation-user";
+        using var auth = _factory.CreateClientWithTestAuth(userId: userId);
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = userId,
+            UserName = "config.no.escalation@test.local",
+            Email = "config.no.escalation@test.local",
+            EmailConfirmed = true,
+            Nombre = "Original"
+        }, "Empleado");
+
+        var response = await auth.Client.PutAsJsonAsync("/api/config/profile", new
+        {
+            nombre = "Actualizado",
+            email = "atacante@test.local",
+            password = "NuevaClave123!",
+            roles = new[] { "Admin" }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var root = doc.RootElement;
+        Assert.Equal("Actualizado", GetProperty(root, "nombre").GetString());
+        Assert.Equal("config.no.escalation@test.local", GetProperty(root, "email").GetString());
+        var roles = GetProperty(root, "roles").EnumerateArray().Select(r => r.GetString()).ToList();
+        Assert.Contains("Empleado", roles);
+        Assert.DoesNotContain("Admin", roles);
+    }
+
     [Fact]
     public async Task PostUsers_PasswordInvalida_Retorna400ConMessageYErrors()
     {
