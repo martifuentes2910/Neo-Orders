@@ -139,6 +139,9 @@ export interface User {
   roles: string[];
 }
 
+/** Item de GET /api/users: el listado administrativo no expone preferencias de apariencia. */
+export type UserListItem = Omit<User, 'tema' | 'paleta'>;
+
 export interface CompanySettings {
   id?: number;
   nombreEmpresa: string;

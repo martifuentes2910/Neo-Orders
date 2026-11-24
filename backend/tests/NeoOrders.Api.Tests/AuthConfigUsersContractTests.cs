@@ -56,6 +56,51 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
     }
 
+    /// <summary>
+    /// KAN-39: el listado administrativo de usuarios no debe exponer las
+    /// preferencias de apariencia (tema/paleta), que siguen disponibles en
+    /// /api/auth/me y /api/config/profile.
+    /// </summary>
+    [Fact]
+    public async Task GetUsers_ConRolAdmin_NoExponeTemaNiPaleta()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var userId = $"users-no-theme-{suffix}";
+        var email = $"users.no.theme.{suffix}@test.local";
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+
+        await auth.SeedUserAsync(new ApplicationUser
+        {
+            Id = userId,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            Nombre = "Sin",
+            Apellido = "Tema",
+            Avatar = "avatar-5",
+            Tema = "oscuro",
+            Paleta = "menta"
+        }, "Empleado");
+
+        var response = await auth.Client.GetAsync("/api/users");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        var usuario = Assert.Single(doc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "id").GetString() == userId);
+
+        Assert.DoesNotContain(usuario.EnumerateObject(), p =>
+            string.Equals(p.Name, "tema", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(p.Name, "paleta", StringComparison.OrdinalIgnoreCase));
+
+        // El resto del shape se conserva.
+        Assert.Equal(email, GetProperty(usuario, "email").GetString());
+        Assert.Equal("Sin", GetProperty(usuario, "nombre").GetString());
+        Assert.Equal("Tema", GetProperty(usuario, "apellido").GetString());
+        Assert.Equal("avatar-5", GetProperty(usuario, "avatar").GetString());
+        Assert.Contains("Empleado", GetProperty(usuario, "roles").EnumerateArray().Select(r => r.GetString()));
+    }
+
     [Fact]
     public async Task GetConfigProfile_ConUsuarioSembrado_Retorna200ConRoles()
     {

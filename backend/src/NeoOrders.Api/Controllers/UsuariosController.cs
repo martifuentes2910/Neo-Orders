@@ -37,7 +37,6 @@ public class UsuariosController : ControllerBase
                 u.Nombre,
                 u.Apellido,
                 u.Avatar,
-                u.Tema,
                 Roles = roles
             });
         }

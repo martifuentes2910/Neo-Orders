@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useTableSort } from '../../hooks/useTableSort';
-import type { User } from '../../types';
+import type { UserListItem } from '../../types';
 import { usersFeatureApi } from './api';
 import { emptyUserForm, type UserFormValues } from './model';
 
 /** Listado, alta y baja de usuarios del sistema (sección de administración). */
 export function useUsers() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<UserFormValues>(emptyUserForm);
