@@ -385,6 +385,35 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
     }
 
     [Fact]
+    public async Task PutOrder_PendienteConVendedorInactivo_Retorna400Message()
+    {
+        using var auth = _factory.CreateClientWithTestAuth();
+        var (clientId, sellerId, productId) = await SeedCatalogAsync(auth);
+        var inactiveSellerId = await SeedSellerAsync(auth, active: false);
+        var orderId = await CreatePendingOrderIdAsync(auth, clientId, sellerId, productId);
+
+        var response = await auth.Client.PutAsJsonAsync($"/api/orders/{orderId}", new
+        {
+            id = orderId,
+            clientId,
+            sellerId = inactiveSellerId,
+            productId,
+            productName = "Producto Contrato",
+            cantidad = 1,
+            precioUnitario = 10.50m,
+            estado = "Pendiente"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("El vendedor está inactivo.", GetProperty(doc.RootElement, "message").GetString());
+
+        var persistedSellerId = await auth.QueryDbAsync(async db =>
+            (await db.Orders.FindAsync(orderId))!.SellerId);
+        Assert.Equal(sellerId, persistedSellerId);
+    }
+
+    [Fact]
     public async Task PatchOrderStatus_ProcesadoAEnviado_Retorna204()
     {
         using var auth = _factory.CreateClientWithTestAuth();
@@ -524,12 +553,15 @@ public class OrdersContractTests : IClassFixture<NeoOrdersApiFactory>
         });
     }
 
-    private static Task<int> SeedSellerAsync(TestAuthClient auth)
+    private static Task<int> SeedSellerAsync(TestAuthClient auth, bool active = true)
     {
         var suffix = Guid.NewGuid().ToString("N");
         return auth.QueryDbAsync(async db =>
         {
-            var seller = Seller.Create($"Vendedor Contrato {suffix}", $"orders.contract.seller.{suffix}@test.local");
+            var seller = Seller.Create(
+                $"Vendedor Contrato {suffix}",
+                $"orders.contract.seller.{suffix}@test.local",
+                active: active);
             db.Sellers.Add(seller);
             await db.SaveChangesAsync();
             return seller.Id;

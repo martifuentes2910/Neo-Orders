@@ -14,8 +14,9 @@ public class OrderService : IOrderService
     {
         if (!await _db.Clients.AnyAsync(c => c.Id == clientId))
             return new OrderResult { Success = false, Error = "Cliente no válido" };
-        if (sellerId.HasValue && !await _db.Sellers.AnyAsync(s => s.Id == sellerId.Value))
-            return new OrderResult { Success = false, Error = "Vendedor no válido" };
+        var sellerError = await ValidateSellerAsync(sellerId);
+        if (sellerError != null)
+            return new OrderResult { Success = false, Error = sellerError };
         if (cantidad < 1)
             return new OrderResult { Success = false, Error = "Cantidad inválida" };
         if (!productId.HasValue)
@@ -32,6 +33,7 @@ public class OrderService : IOrderService
 
         var prod = await _db.Products.FindAsync(productId.Value);
         if (prod == null) return new OrderResult { Success = false, Error = "Producto no válido" };
+        if (!prod.Active) return new OrderResult { Success = false, Error = "El producto está inactivo." };
 
         // KAN-38: una sola definición de Order (dominio + persistencia), sin mapas Domain/Ef.
         var order = Order.CreateNew(
@@ -51,8 +53,9 @@ public class OrderService : IOrderService
             return new OrderResult { Success = false, Error = $"El pedido está {existing.Estado}: no se puede editar, solo cambiar el estado" };
         if (!await _db.Clients.AnyAsync(c => c.Id == clientId))
             return new OrderResult { Success = false, Error = "Cliente no válido" };
-        if (sellerId.HasValue && !await _db.Sellers.AnyAsync(s => s.Id == sellerId.Value))
-            return new OrderResult { Success = false, Error = "Vendedor no válido" };
+        var sellerError = await ValidateSellerAsync(sellerId);
+        if (sellerError != null)
+            return new OrderResult { Success = false, Error = sellerError };
         if (cantidad < 1)
             return new OrderResult { Success = false, Error = "Cantidad inválida" };
         if (!OrderStatusPolicy.IsValid(estado))
@@ -129,6 +132,18 @@ public class OrderService : IOrderService
         _db.Orders.Remove(p);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    // KAN-39: misma regla que la importación CSV (vendedor inactivo no válido),
+    // compartida por alta y edición de pedidos.
+    private async Task<string?> ValidateSellerAsync(int? sellerId)
+    {
+        if (!sellerId.HasValue) return null;
+
+        var seller = await _db.Sellers.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sellerId.Value);
+        if (seller == null) return "Vendedor no válido";
+        if (!seller.Active) return "El vendedor está inactivo.";
+        return null;
     }
 
     // KAN-35/KAN-38: única rutina de transición. El dominio decide transición y efecto de stock;

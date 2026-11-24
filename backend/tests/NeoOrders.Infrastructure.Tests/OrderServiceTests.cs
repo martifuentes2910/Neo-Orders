@@ -50,6 +50,59 @@ public class OrderServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_RejectsInactiveSeller()
+    {
+        using var db = CreateDb();
+        db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
+        db.Sellers.Add(Seller.Rehydrate(id: 1, name: "S", email: "s@s.com", active: false));
+        db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
+        await db.SaveChangesAsync();
+
+        var svc = new OrderService(db);
+        var result = await svc.CreateAsync(1, 1, 1, 1);
+
+        Assert.False(result.Success);
+        Assert.Equal("El vendedor está inactivo.", result.Error);
+        Assert.Empty(db.Orders);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsInactiveProduct()
+    {
+        using var db = CreateDb();
+        db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
+        db.Sellers.Add(Seller.Rehydrate(id: 1, name: "S", email: "s@s.com", active: true));
+        db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: false));
+        await db.SaveChangesAsync();
+
+        var svc = new OrderService(db);
+        var result = await svc.CreateAsync(1, 1, 1, 1);
+
+        Assert.False(result.Success);
+        Assert.Equal("El producto está inactivo.", result.Error);
+        Assert.Empty(db.Orders);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_RejectsInactiveSeller()
+    {
+        using var db = CreateDb();
+        db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
+        db.Sellers.Add(Seller.Rehydrate(id: 1, name: "S activo", email: "s@s.com", active: true));
+        db.Sellers.Add(Seller.Rehydrate(id: 2, name: "S inactivo", email: "s2@s.com", active: false));
+        db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
+        db.Orders.Add(Order.Rehydrate(1, 1, 1, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatusPolicy.Pendiente, null));
+        await db.SaveChangesAsync();
+
+        var svc = new OrderService(db);
+        var result = await svc.UpdateAsync(1, 1, 2, 1, OrderStatusPolicy.Pendiente);
+
+        Assert.False(result.Success);
+        Assert.Equal("El vendedor está inactivo.", result.Error);
+        Assert.Equal(1, (await db.Orders.FindAsync(1))!.SellerId);
+    }
+
+    [Fact]
     public async Task UpdateStatus_PendienteToProcesado_DecreasesStock()
     {
         using var db = CreateDb();

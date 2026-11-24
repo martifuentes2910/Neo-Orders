@@ -36,12 +36,11 @@ public class ContractCloseoutTests : IClassFixture<NeoOrdersApiFactory>
     // ---------------- A) Orders ----------------
 
     /// <summary>
-    /// OrderService.CreateAsync comprueba solo la existencia del vendedor, no Active
-    /// (a diferencia de la importación CSV, que sí rechaza vendedores inactivos).
-    /// Se documenta el contrato observado para hacer visible la divergencia.
+    /// KAN-39: el alta directa aplica la misma regla que la importación CSV y
+    /// rechaza vendedores inactivos con el contrato de error habitual {message}.
     /// </summary>
     [Fact]
-    public async Task PostOrder_VendedorInactivo_ContratoObservadoRetorna201()
+    public async Task PostOrder_VendedorInactivo_Retorna400Message()
     {
         using var auth = _factory.CreateClientWithTestAuth();
         var clientId = await SeedClientAsync(auth);
@@ -50,19 +49,16 @@ public class ContractCloseoutTests : IClassFixture<NeoOrdersApiFactory>
 
         var response = await PostOrderAsync(auth.Client, clientId, inactiveSellerId, productId);
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        using var doc = await ReadJsonAsync(response);
-        var orderId = GetProperty(doc.RootElement, "id").GetInt32();
-        var persistedSellerId = await auth.QueryDbAsync(async db => (await db.Orders.FindAsync(orderId))!.SellerId);
-        Assert.Equal(inactiveSellerId, persistedSellerId);
+        await AssertBadRequestMessageAsync(response, "El vendedor está inactivo.");
+        Assert.True(await auth.QueryDbAsync(async db => !await db.Orders.AnyAsync()));
     }
 
     /// <summary>
-    /// Igual que el vendedor: el alta directa no filtra por Product.Active; el
-    /// rechazo de productos inactivos existe únicamente en el importador CSV.
+    /// KAN-39: igual que el vendedor, un producto inactivo se rechaza también
+    /// en el alta directa (antes sólo lo rechazaba el importador CSV).
     /// </summary>
     [Fact]
-    public async Task PostOrder_ProductoInactivo_ContratoObservadoRetorna201()
+    public async Task PostOrder_ProductoInactivo_Retorna400Message()
     {
         using var auth = _factory.CreateClientWithTestAuth();
         var clientId = await SeedClientAsync(auth);
@@ -71,16 +67,8 @@ public class ContractCloseoutTests : IClassFixture<NeoOrdersApiFactory>
 
         var response = await PostOrderAsync(auth.Client, clientId, sellerId, inactiveProductId);
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        using var doc = await ReadJsonAsync(response);
-        var orderId = GetProperty(doc.RootElement, "id").GetInt32();
-        var persisted = await auth.QueryDbAsync(async db =>
-        {
-            var order = (await db.Orders.FindAsync(orderId))!;
-            return (order.ProductId, order.ProductName);
-        });
-        Assert.Equal(inactiveProductId, persisted.ProductId);
-        Assert.False(string.IsNullOrWhiteSpace(persisted.ProductName));
+        await AssertBadRequestMessageAsync(response, "El producto está inactivo.");
+        Assert.True(await auth.QueryDbAsync(async db => !await db.Orders.AnyAsync()));
     }
 
     /// <summary>
