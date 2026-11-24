@@ -44,6 +44,16 @@ public class UsuariosController : ControllerBase
         return admins.Count == 1 && string.Equals(admins[0].Id, user.Id, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// KAN-41: un rol válido es no vacío, pertenece al dominio (Admin/Empleado) y
+    /// existe en Identity. Compartido por Create y SetRol para que ambas altas y
+    /// cambios de rol respondan igual ante un rol inválido.
+    /// </summary>
+    private async Task<bool> IsValidRoleAsync(string? rol) =>
+        !string.IsNullOrWhiteSpace(rol) &&
+        AllowedRoles.Contains(rol, StringComparer.Ordinal) &&
+        await _roleManager.RoleExistsAsync(rol);
+
     [HttpGet]
     public async Task<IActionResult> List()
     {
@@ -69,6 +79,10 @@ public class UsuariosController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CrearUsuarioDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
+        // KAN-41: sin esta guardia AddToRoleAsync falla en silencio y deja la
+        // cuenta creada sin rol, o asigna un rol fuera del dominio.
+        if (!await IsValidRoleAsync(dto.Rol))
+            return BadRequest(new { message = "Rol no válido." });
         if (await _userManager.FindByEmailAsync(dto.Email) != null)
             return BadRequest(new { message = "El email ya está registrado" });
 
@@ -100,9 +114,7 @@ public class UsuariosController : ControllerBase
         // Sin esta guardia se removían todos los roles y AddToRoleAsync fallaba
         // silenciosamente, dejando al usuario sin ningún rol (KAN-41).
         // KAN-39: además, el rol debe ser uno de los definidos en el dominio.
-        if (string.IsNullOrWhiteSpace(dto.Rol) ||
-            !AllowedRoles.Contains(dto.Rol, StringComparer.Ordinal) ||
-            !await _roleManager.RoleExistsAsync(dto.Rol))
+        if (!await IsValidRoleAsync(dto.Rol))
             return BadRequest(new { message = "Rol no válido." });
 
         // KAN-39: el administrador no debe auto-modificarse el rol: los claims de

@@ -805,6 +805,71 @@ public class AuthConfigUsersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.NotEmpty(errors.EnumerateArray());
     }
 
+    /// <summary>
+    /// KAN-41: Create debe aplicar la misma validación de dominio que SetRol.
+    /// El rol existe en Identity, pero no es Admin/Empleado; antes se creaba
+    /// la cuenta y se le asignaba ese rol peligroso sin validar.
+    /// </summary>
+    [Fact]
+    public async Task PostUsers_RolFueraDelDominio_Retorna400YNoCreaUsuario()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+        await SeedRoleViaUserAsync(auth, "SuperAdmin");
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var email = $"users.rol.out.domain.{suffix}@test.local";
+        var response = await auth.Client.PostAsJsonAsync("/api/users", new
+        {
+            nombre = "Rol",
+            apellido = "Dominio",
+            email,
+            password = "Clave123!",
+            rol = "SuperAdmin"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Rol no válido.", GetProperty(doc.RootElement, "message").GetString());
+
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        Assert.DoesNotContain(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "email").GetString() == email);
+    }
+
+    /// <summary>
+    /// KAN-41: tampoco se crea la cuenta si el rol es del dominio pero no existe
+    /// en Identity (sin sembrar): antes AddToRoleAsync fallaba en silencio y
+    /// dejaba un usuario sin ningún rol.
+    /// </summary>
+    [Fact]
+    public async Task PostUsers_RolInexistente_Retorna400YNoCreaUsuario()
+    {
+        using var auth = _factory.CreateClientWithTestAuth(roles: ["Admin"]);
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var email = $"users.rol.missing.{suffix}@test.local";
+        var response = await auth.Client.PostAsJsonAsync("/api/users", new
+        {
+            nombre = "Rol",
+            apellido = "Inexistente",
+            email,
+            password = "Clave123!",
+            rol = "Admin"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = await ReadJsonAsync(response);
+        Assert.Equal("Rol no válido.", GetProperty(doc.RootElement, "message").GetString());
+
+        var usuarios = await auth.Client.GetAsync("/api/users");
+        Assert.Equal(HttpStatusCode.OK, usuarios.StatusCode);
+        using var usuariosDoc = await ReadJsonAsync(usuarios);
+        Assert.DoesNotContain(usuariosDoc.RootElement.EnumerateArray(),
+            u => GetProperty(u, "email").GetString() == email);
+    }
+
     [Fact]
     public async Task GetConfigCompany_SinAuth_Retorna401()
     {
