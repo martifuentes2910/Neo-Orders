@@ -19,13 +19,30 @@ public class ProductService : IProductService
         => ex.InnerException?.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) == true
            || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true;
 
-    public async Task<List<ProductDto>> ListAsync(string? search, string? category, bool? onlyInStock)
+    public async Task<List<ProductDto>> ListAsync(
+        string? search,
+        string? category,
+        bool? onlyInStock,
+        string? sku = null,
+        string? nombre = null)
     {
         var q = _db.Products.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
             q = q.Where(p => p.Name.ToLower().Contains(s) || p.Sku.ToLower().Contains(s));
+        }
+        // Mismo criterio que `search`: contains case-insensitive, pero acotado
+        // al campo correspondiente. Se combinan con AND entre sí y con el resto.
+        if (!string.IsNullOrWhiteSpace(sku))
+        {
+            var s = sku.Trim().ToLower();
+            q = q.Where(p => p.Sku.ToLower().Contains(s));
+        }
+        if (!string.IsNullOrWhiteSpace(nombre))
+        {
+            var n = nombre.Trim().ToLower();
+            q = q.Where(p => p.Name.ToLower().Contains(n));
         }
         if (!string.IsNullOrWhiteSpace(category) && category != "Todos") q = q.Where(p => p.Category == category);
         if (onlyInStock == true) q = q.Where(p => p.Stock > 0);

@@ -542,7 +542,7 @@ public class ContractCloseoutTests : IClassFixture<NeoOrdersApiFactory>
 
     private sealed class DuplicateSkuProductService : IProductService
     {
-        public Task<List<ProductDto>> ListAsync(string? search, string? category, bool? onlyInStock) =>
+        public Task<List<ProductDto>> ListAsync(string? search, string? category, bool? onlyInStock, string? sku = null, string? nombre = null) =>
             Task.FromResult(new List<ProductDto>());
         public Task<List<string>> CategoriesAsync() => Task.FromResult(new List<string>());
         public Task<ProductDto?> GetByIdAsync(int id) => Task.FromResult<ProductDto?>(null);

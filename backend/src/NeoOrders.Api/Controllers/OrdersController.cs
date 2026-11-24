@@ -23,8 +23,15 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? estado, [FromQuery] int? clientId, [FromQuery] int? sellerId)
-        => Ok(await _orderQuery.ListAsync(search, estado, clientId, sellerId));
+    public async Task<IActionResult> List(
+        [FromQuery] string? search,
+        [FromQuery] string? estado,
+        [FromQuery] int? clientId,
+        [FromQuery] int? sellerId,
+        [FromQuery] int? productId,
+        [FromQuery] string? desde,
+        [FromQuery] string? hasta)
+        => Ok(await _orderQuery.ListAsync(search, estado, clientId, sellerId, productId, desde, hasta));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)

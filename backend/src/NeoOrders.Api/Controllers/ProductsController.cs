@@ -17,8 +17,13 @@ public class ProductsController : ControllerBase
     public ProductsController(IProductService products, ICsvImportService csvImport) { _products = products; _csvImport = csvImport; }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? category, [FromQuery] bool? onlyInStock)
-        => Ok(await _products.ListAsync(search, category, onlyInStock));
+    public async Task<IActionResult> List(
+        [FromQuery] string? search,
+        [FromQuery] string? category,
+        [FromQuery] bool? onlyInStock,
+        [FromQuery] string? sku,
+        [FromQuery] string? nombre)
+        => Ok(await _products.ListAsync(search, category, onlyInStock, sku, nombre));
 
     [HttpGet("categories")]
     public async Task<IActionResult> Categories() => Ok(await _products.CategoriesAsync());
