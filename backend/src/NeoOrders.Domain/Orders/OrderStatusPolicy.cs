@@ -1,6 +1,6 @@
 namespace NeoOrders.Domain.Orders;
 
-public static class OrderStatuses
+public static class OrderStatusPolicy
 {
     public const string Pendiente = nameof(OrderStatus.Pendiente);
     public const string Procesado = nameof(OrderStatus.Procesado);

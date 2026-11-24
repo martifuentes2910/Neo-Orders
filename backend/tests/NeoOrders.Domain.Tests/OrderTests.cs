@@ -21,7 +21,7 @@ public class OrderTests
     {
         var order = Create();
 
-        Assert.Equal(OrderStatuses.Pendiente, order.Estado);
+        Assert.Equal(OrderStatusPolicy.Pendiente, order.Estado);
         Assert.Equal(OrderStatus.Pendiente, order.Status);
         Assert.Equal(21m, order.Total);
         Assert.Equal(0, order.Id);
@@ -62,10 +62,10 @@ public class OrderTests
     public void Rehydrate_ConservaEstadoSinRevalidar()
     {
         var order = Order.Rehydrate(7, 1, null, 1, "Prod", 3, 4m, 12m,
-            DateTime.UtcNow, OrderStatuses.Cancelado, "ORD-7");
+            DateTime.UtcNow, OrderStatusPolicy.Cancelado, "ORD-7");
 
         Assert.Equal(7, order.Id);
-        Assert.Equal(OrderStatuses.Cancelado, order.Estado);
+        Assert.Equal(OrderStatusPolicy.Cancelado, order.Estado);
         Assert.Equal(12m, order.Total);
         Assert.True(order.IsEditLocked);
     }
@@ -103,7 +103,7 @@ public class OrderTests
     {
         var order = Create();
 
-        var change = order.PlanStatusChange(OrderStatuses.Procesado);
+        var change = order.PlanStatusChange(OrderStatusPolicy.Procesado);
 
         Assert.True(change.Success);
         Assert.Null(change.Error);
@@ -111,7 +111,7 @@ public class OrderTests
         Assert.Equal(OrderStatus.Procesado, change.To);
         Assert.Equal(OrderStockEffect.Decrease, change.StockEffect);
         Assert.False(change.IsNoOp);
-        Assert.Equal(OrderStatuses.Procesado, change.NewStatus);
+        Assert.Equal(OrderStatusPolicy.Procesado, change.NewStatus);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class OrderTests
     {
         var order = CreateForStatus(OrderStatus.Procesado);
 
-        var change = order.PlanStatusChange(OrderStatuses.Cancelado);
+        var change = order.PlanStatusChange(OrderStatusPolicy.Cancelado);
 
         Assert.True(change.Success);
         Assert.Equal(OrderStockEffect.Restore, change.StockEffect);
@@ -130,7 +130,7 @@ public class OrderTests
     {
         var order = Create();
 
-        var change = order.PlanStatusChange(OrderStatuses.Cancelado);
+        var change = order.PlanStatusChange(OrderStatusPolicy.Cancelado);
 
         Assert.True(change.Success);
         Assert.Equal(OrderStockEffect.None, change.StockEffect);
@@ -141,7 +141,7 @@ public class OrderTests
     {
         var order = Create();
 
-        var change = order.PlanStatusChange(OrderStatuses.Pendiente);
+        var change = order.PlanStatusChange(OrderStatusPolicy.Pendiente);
 
         Assert.True(change.Success);
         Assert.True(change.IsNoOp);
@@ -153,7 +153,7 @@ public class OrderTests
     {
         var order = Create();
 
-        var change = order.PlanStatusChange(OrderStatuses.Entregado);
+        var change = order.PlanStatusChange(OrderStatusPolicy.Entregado);
 
         Assert.False(change.Success);
         Assert.Equal("Transición de estado no permitida: Pendiente → Entregado", change.Error);
@@ -175,11 +175,11 @@ public class OrderTests
     public void ApplyStatusChange_ActualizaEstadoExterno()
     {
         var order = Create();
-        var change = order.PlanStatusChange(OrderStatuses.Procesado);
+        var change = order.PlanStatusChange(OrderStatusPolicy.Procesado);
 
         order.ApplyStatusChange(change);
 
-        Assert.Equal(OrderStatuses.Procesado, order.Estado);
+        Assert.Equal(OrderStatusPolicy.Procesado, order.Estado);
         Assert.Equal(OrderStatus.Procesado, order.Status);
     }
 
@@ -187,10 +187,10 @@ public class OrderTests
     public void ApplyStatusChange_ConCambioFallido_Lanza()
     {
         var order = Create();
-        var change = order.PlanStatusChange(OrderStatuses.Entregado);
+        var change = order.PlanStatusChange(OrderStatusPolicy.Entregado);
 
         Assert.Throws<InvalidOperationException>(() => order.ApplyStatusChange(change));
-        Assert.Equal(OrderStatuses.Pendiente, order.Estado);
+        Assert.Equal(OrderStatusPolicy.Pendiente, order.Estado);
     }
 
     [Fact]

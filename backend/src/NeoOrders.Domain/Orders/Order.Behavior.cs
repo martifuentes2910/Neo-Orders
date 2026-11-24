@@ -4,7 +4,7 @@ public sealed partial class Order
 {
     public OrderStatus Status => OrderStatusMapper.FromExternal(Estado);
 
-    public bool IsEditLocked => OrderStatuses.EditLocked.Contains(Estado);
+    public bool IsEditLocked => OrderStatusPolicy.EditLocked.Contains(Estado);
 
     public static Order CreateNew(
         int clientId,
@@ -28,7 +28,7 @@ public sealed partial class Order
             PrecioUnitario = precioUnitario,
             Total = CalculateTotal(cantidad, precioUnitario),
             Fecha = fecha,
-            Estado = OrderStatuses.Pendiente,
+            Estado = OrderStatusPolicy.Pendiente,
             OrderNumber = NormalizeOrderNumber(orderNumber)
         };
     }
@@ -76,10 +76,10 @@ public sealed partial class Order
     }
 
     public bool CanTransitionTo(OrderStatus to) =>
-        OrderStatusMapper.TryParse(Estado, out var from) && OrderStatuses.CanTransition(from, to);
+        OrderStatusMapper.TryParse(Estado, out var from) && OrderStatusPolicy.CanTransition(from, to);
 
     // Coincide con la validación externa actual: strings canónicos, case-sensitive.
-    public bool CanTransitionTo(string? to) => OrderStatuses.CanTransition(Estado, to ?? string.Empty);
+    public bool CanTransitionTo(string? to) => OrderStatusPolicy.CanTransition(Estado, to ?? string.Empty);
 
     public OrderStatusChange PlanStatusChange(string? newStatusRaw)
     {
@@ -87,12 +87,12 @@ public sealed partial class Order
             return OrderStatusChange.Failed("Estado no válido");
         if (!OrderStatusMapper.TryParse(Estado, out var from))
             return OrderStatusChange.Failed("Estado actual no válido");
-        if (!OrderStatuses.CanTransition(from, to))
+        if (!OrderStatusPolicy.CanTransition(from, to))
             return OrderStatusChange.Failed($"Transición de estado no permitida: {Estado} → {to.ToExternal()}");
 
         var stockEffect = from == to ? OrderStockEffect.None
-            : OrderStatuses.DecreasesStock(from, to) ? OrderStockEffect.Decrease
-            : OrderStatuses.RestoresStock(from, to) ? OrderStockEffect.Restore
+            : OrderStatusPolicy.DecreasesStock(from, to) ? OrderStockEffect.Decrease
+            : OrderStatusPolicy.RestoresStock(from, to) ? OrderStockEffect.Restore
             : OrderStockEffect.None;
 
         return new OrderStatusChange(true, null, from, to, stockEffect);

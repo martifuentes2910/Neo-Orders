@@ -104,8 +104,8 @@ public class ListFiltersContractTests : IClassFixture<NeoOrdersApiFactory>
                 db.AddRange(firstClient, secondClient, firstSeller, secondSeller);
                 await db.SaveChangesAsync();
 
-                var first = NewOrder(firstClient.Id, firstSeller.Id, $"Pedido A {suffix}", OrderStatuses.Pendiente, $"A-{suffix}");
-                var second = NewOrder(secondClient.Id, secondSeller.Id, $"Pedido B {suffix}", OrderStatuses.Procesado, $"B-{suffix}");
+                var first = NewOrder(firstClient.Id, firstSeller.Id, $"Pedido A {suffix}", OrderStatusPolicy.Pendiente, $"A-{suffix}");
+                var second = NewOrder(secondClient.Id, secondSeller.Id, $"Pedido B {suffix}", OrderStatusPolicy.Procesado, $"B-{suffix}");
                 db.Orders.AddRange(first, second);
                 await db.SaveChangesAsync();
 
@@ -117,7 +117,7 @@ public class ListFiltersContractTests : IClassFixture<NeoOrdersApiFactory>
         Assert.Contains(firstId, bySearch);
         Assert.Contains(secondId, bySearch);
 
-        var byEstado = await ReadIdsAsync(await auth.Client.GetAsync($"/api/orders?estado={OrderStatuses.Pendiente}"));
+        var byEstado = await ReadIdsAsync(await auth.Client.GetAsync($"/api/orders?estado={OrderStatusPolicy.Pendiente}"));
         Assert.Equal(new[] { firstId }, byEstado);
 
         var byCliente = await ReadIdsAsync(await auth.Client.GetAsync($"/api/orders?clientId={secondClientId}"));

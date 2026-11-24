@@ -55,7 +55,7 @@ public class OrderService : IOrderService
             return new OrderResult { Success = false, Error = "Vendedor no válido" };
         if (cantidad < 1)
             return new OrderResult { Success = false, Error = "Cantidad inválida" };
-        if (!OrderStatuses.IsValid(estado))
+        if (!OrderStatusPolicy.IsValid(estado))
             return new OrderResult { Success = false, Error = "Estado no válido" };
         if (!existing.CanTransitionTo(estado))
             return new OrderResult { Success = false, Error = $"Transición de estado no permitida: {existing.Estado} → {estado}" };
@@ -92,7 +92,7 @@ public class OrderService : IOrderService
         var existing = await _db.Orders.FindAsync(id);
         if (existing == null)
             return new OrderResult { Success = false, NotFound = true, Error = "Pedido no encontrado" };
-        if (!OrderStatuses.IsValid(estado))
+        if (!OrderStatusPolicy.IsValid(estado))
             return new OrderResult { Success = false, Error = "Estado no válido" };
         if (!existing.CanTransitionTo(estado))
             return new OrderResult { Success = false, Error = $"Transición de estado no permitida: {existing.Estado} → {estado}" };

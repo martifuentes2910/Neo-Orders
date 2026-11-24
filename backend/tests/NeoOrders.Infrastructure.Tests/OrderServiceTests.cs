@@ -28,7 +28,7 @@ public class OrderServiceTests
 
         Assert.True(result.Success);
         var order = await db.Orders.SingleAsync();
-        Assert.Equal(OrderStatuses.Pendiente, order.Estado);
+        Assert.Equal(OrderStatusPolicy.Pendiente, order.Estado);
         Assert.Equal("ORD-1", order.OrderNumber);
         Assert.Equal(5, (await db.Products.FindAsync(1))!.Stock);
     }
@@ -39,7 +39,7 @@ public class OrderServiceTests
         using var db = CreateDb();
         db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
         db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
-        db.Orders.Add(Order.Rehydrate(0, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatuses.Pendiente, "ORD-1"));
+        db.Orders.Add(Order.Rehydrate(0, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatusPolicy.Pendiente, "ORD-1"));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
@@ -55,15 +55,15 @@ public class OrderServiceTests
         using var db = CreateDb();
         db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
         db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
-        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatuses.Pendiente, null));
+        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatusPolicy.Pendiente, null));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
-        var result = await svc.UpdateStatusAsync(1, OrderStatuses.Procesado);
+        var result = await svc.UpdateStatusAsync(1, OrderStatusPolicy.Procesado);
 
         Assert.True(result.Success);
         Assert.Equal(3, (await db.Products.FindAsync(1))!.Stock);
-        Assert.Equal(OrderStatuses.Procesado, (await db.Orders.FindAsync(1))!.Estado);
+        Assert.Equal(OrderStatusPolicy.Procesado, (await db.Orders.FindAsync(1))!.Estado);
     }
 
     [Fact]
@@ -71,11 +71,11 @@ public class OrderServiceTests
     {
         using var db = CreateDb();
         db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 3, active: true));
-        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatuses.Procesado, null));
+        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 2, 10m, 20m, DateTime.UtcNow, OrderStatusPolicy.Procesado, null));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
-        var result = await svc.UpdateStatusAsync(1, OrderStatuses.Cancelado);
+        var result = await svc.UpdateStatusAsync(1, OrderStatusPolicy.Cancelado);
 
         Assert.True(result.Success);
         Assert.Equal(5, (await db.Products.FindAsync(1))!.Stock);
@@ -85,11 +85,11 @@ public class OrderServiceTests
     public async Task UpdateStatus_InvalidTransition_ReturnsError()
     {
         using var db = CreateDb();
-        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatuses.Pendiente, null));
+        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatusPolicy.Pendiente, null));
         await db.SaveChangesAsync();
 
         var svc = new OrderService(db);
-        var result = await svc.UpdateStatusAsync(1, OrderStatuses.Entregado);
+        var result = await svc.UpdateStatusAsync(1, OrderStatusPolicy.Entregado);
 
         Assert.False(result.Success);
         Assert.Contains("no permitida", result.Error, StringComparison.OrdinalIgnoreCase);

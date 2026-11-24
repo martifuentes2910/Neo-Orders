@@ -79,7 +79,7 @@ public static class DbSeeder
             await db.SaveChangesAsync();
 
             var rnd = new Random(42);
-            var estados = OrderStatuses.All;
+            var estados = OrderStatusPolicy.All;
             var pedidos = new List<Order>();
             for (int i = 0; i < 60; i++)
             {
@@ -89,8 +89,8 @@ public static class DbSeeder
                 var cantidad = rnd.Next(1, 4);
                 var fecha = DateTime.UtcNow.AddDays(-rnd.Next(0, 180));
                 var estado = estados[rnd.Next(estados.Length)];
-                if (i % 7 == 0) estado = OrderStatuses.Entregado;
-                if (i % 11 == 0) estado = OrderStatuses.Pendiente;
+                if (i % 7 == 0) estado = OrderStatusPolicy.Entregado;
+                if (i % 11 == 0) estado = OrderStatusPolicy.Pendiente;
                 pedidos.Add(Order.Rehydrate(
                     id: 0,
                     clientId: cliente.Id,

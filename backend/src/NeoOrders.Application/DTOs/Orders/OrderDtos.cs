@@ -27,5 +27,5 @@ public class UpdateOrderDto
     public string ProductName { get; set; } = string.Empty;
     public int Cantidad { get; set; } = 1;
     public decimal PrecioUnitario { get; set; }
-    public string Estado { get; set; } = OrderStatuses.Pendiente;
+    public string Estado { get; set; } = OrderStatusPolicy.Pendiente;
 }

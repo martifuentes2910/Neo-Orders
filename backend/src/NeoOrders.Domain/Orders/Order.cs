@@ -19,7 +19,7 @@ public sealed partial class Order
     public decimal PrecioUnitario { get; private set; }
     public decimal Total { get; private set; }
     public DateTime Fecha { get; private set; }
-    public string Estado { get; private set; } = OrderStatuses.Pendiente;
+    public string Estado { get; private set; } = OrderStatusPolicy.Pendiente;
     public string? OrderNumber { get; private set; }
 
     // Navegaciones requeridas por el mapeo EF (configuradas en OrderConfiguration).

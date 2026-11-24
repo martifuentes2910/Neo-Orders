@@ -97,7 +97,7 @@ public class NotificationService : INotificationService
         var stockCritico = await _db.Products.AsNoTracking()
             .CountAsync(p => p.Active && p.Stock <= p.MinStockAlert);
         var pendientes = await _db.Orders.AsNoTracking()
-            .CountAsync(o => o.Estado == OrderStatuses.Pendiente);
+            .CountAsync(o => o.Estado == OrderStatusPolicy.Pendiente);
 
         return new NotificationsResponseDto
         {

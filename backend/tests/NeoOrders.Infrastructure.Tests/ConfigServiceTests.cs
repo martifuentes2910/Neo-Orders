@@ -22,7 +22,7 @@ public class ConfigServiceTests
         db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
         db.Sellers.Add(Seller.Rehydrate(id: 1, name: "S", email: "s@s.com", active: true));
         db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "P", category: "Cat", basePrice: 10m, stock: 1, active: true));
-        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "P", 1, 10m, 10m, DateTime.UtcNow, OrderStatuses.Pendiente, null));
+        db.Orders.Add(Order.Rehydrate(1, 1, null, 1, "P", 1, 10m, 10m, DateTime.UtcNow, OrderStatusPolicy.Pendiente, null));
         db.Notifications.Add(Notification.Rehydrate(id: 1, tipo: "sistema", accion: "creado", titulo: "T", mensaje: "n"));
         await db.SaveChangesAsync();
 

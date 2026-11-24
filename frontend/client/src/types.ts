@@ -8,7 +8,7 @@ export const ORDER_STATUSES: OrderStatus[] = [
   'Cancelado',
 ];
 
-// KAN-16/KAN-35: espejo de OrderStatuses en backend/OrdersApi/Models/Order.cs.
+// KAN-16/KAN-35: espejo de OrderStatusPolicy en backend/OrdersApi/Models/Order.cs.
 // Pendiente -> Procesado/Cancelado; Procesado -> Enviado/Cancelado;
 // Enviado -> Entregado; Entregado y Cancelado son terminales.
 export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {

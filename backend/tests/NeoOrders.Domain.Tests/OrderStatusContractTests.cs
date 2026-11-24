@@ -10,13 +10,13 @@ public class OrderStatusContractTests
     {
         Assert.Equal(
             new[] { "Pendiente", "Procesado", "Enviado", "Entregado", "Cancelado" },
-            OrderStatuses.All);
+            OrderStatusPolicy.All);
     }
 
     [Fact]
     public void Mapper_RoundTrip_ConservaTodosLosEstados()
     {
-        Assert.All(OrderStatuses.All, external =>
+        Assert.All(OrderStatusPolicy.All, external =>
             Assert.Equal(external, OrderStatusMapper.FromExternal(external).ToExternal()));
     }
 
@@ -29,7 +29,7 @@ public class OrderStatusContractTests
     public void StockRules_SoloAplicanALasTransicionesPrevistas(
         OrderStatus from, OrderStatus to, bool decreases, bool restores)
     {
-        Assert.Equal(decreases, OrderStatuses.DecreasesStock(from, to));
-        Assert.Equal(restores, OrderStatuses.RestoresStock(from, to));
+        Assert.Equal(decreases, OrderStatusPolicy.DecreasesStock(from, to));
+        Assert.Equal(restores, OrderStatusPolicy.RestoresStock(from, to));
     }
 }

@@ -322,7 +322,7 @@ public sealed class CsvImportService : ICsvImportService
                 precioUnitario: prod.BasePrice,
                 total: p.Cantidad * prod.BasePrice,
                 fecha: now,
-                estado: OrderStatuses.Pendiente,
+                estado: OrderStatusPolicy.Pendiente,
                 orderNumber: p.OrderNumber));
         }
 

@@ -63,7 +63,7 @@ public class CsvImportServiceTests
         var okResult = await svc.ImportOrdersAsync(ok);
         Assert.Equal(1, okResult.Imported);
         var order = await db.Orders.SingleAsync();
-        Assert.Equal(OrderStatuses.Pendiente, order.Estado);
+        Assert.Equal(OrderStatusPolicy.Pendiente, order.Estado);
         Assert.Equal(5, (await db.Products.FindAsync(1))!.Stock); // no descuenta
     }
 
@@ -91,7 +91,7 @@ public class CsvImportServiceTests
         using var db = CreateDb();
         db.Clients.Add(Client.Rehydrate(id: 1, nombre: "C", email: "c@c.com"));
         db.Products.Add(Product.Rehydrate(id: 1, sku: "SKU1", name: "Prod", category: "Cat", basePrice: 10m, stock: 5, active: true));
-        db.Orders.Add(Order.Rehydrate(0, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatuses.Pendiente, "ORD-EXIST"));
+        db.Orders.Add(Order.Rehydrate(0, 1, null, 1, "Prod", 1, 10m, 10m, DateTime.UtcNow, OrderStatusPolicy.Pendiente, "ORD-EXIST"));
         await db.SaveChangesAsync();
 
         var svc = new CsvImportService(db);

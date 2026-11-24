@@ -19,7 +19,7 @@ internal static class ReporteQueryHelper
     }
 
     public static IQueryable<Order> ExcluirCancelados(IQueryable<Order> query) =>
-        query.Where(p => p.Estado != OrderStatuses.Cancelado);
+        query.Where(p => p.Estado != OrderStatusPolicy.Cancelado);
 
     public static int CalcularTotalPaginas(int totalFilas, int tamanoPagina) =>
         totalFilas == 0 ? 0 : (int)Math.Ceiling((double)totalFilas / tamanoPagina);

@@ -20,9 +20,9 @@ public sealed class DashboardMetricsRepository : IDashboardMetricsRepository
             .ToListAsync();
 
         var totalPedidos = porEstado.Sum(x => x.Cantidad);
-        var ingresos = porEstado.Where(x => x.Estado != OrderStatuses.Cancelado).Sum(x => x.Total);
-        var pendientes = porEstado.FirstOrDefault(x => x.Estado == OrderStatuses.Pendiente)?.Cantidad ?? 0;
-        var entregados = porEstado.FirstOrDefault(x => x.Estado == OrderStatuses.Entregado)?.Cantidad ?? 0;
+        var ingresos = porEstado.Where(x => x.Estado != OrderStatusPolicy.Cancelado).Sum(x => x.Total);
+        var pendientes = porEstado.FirstOrDefault(x => x.Estado == OrderStatusPolicy.Pendiente)?.Cantidad ?? 0;
+        var entregados = porEstado.FirstOrDefault(x => x.Estado == OrderStatusPolicy.Entregado)?.Cantidad ?? 0;
 
         var clientes = await _db.Clients.CountAsync();
         var vendedores = await _db.Sellers.CountAsync();
@@ -50,7 +50,7 @@ public sealed class DashboardMetricsRepository : IDashboardMetricsRepository
 
         // KAN-24: serie mensual sin cancelados para los nuevos indicadores compactos.
         var serieMensual = await _db.Orders.AsNoTracking()
-            .Where(p => p.Estado != OrderStatuses.Cancelado)
+            .Where(p => p.Estado != OrderStatusPolicy.Cancelado)
             .GroupBy(p => new { p.Fecha.Year, p.Fecha.Month })
             .Select(g => new SerieMensualDto
             {
@@ -68,7 +68,7 @@ public sealed class DashboardMetricsRepository : IDashboardMetricsRepository
         // KAN-24: top 5 por unidades. Se agrupa también por nombre para no mezclar productos borrados.
         // El join se resuelve en dos consultas: EF no traduce un LeftJoin después de GroupBy con agregados.
         var topProductos = await _db.Orders.AsNoTracking()
-            .Where(p => p.Estado != OrderStatuses.Cancelado)
+            .Where(p => p.Estado != OrderStatusPolicy.Cancelado)
             .GroupBy(p => new { p.ProductId, p.ProductName })
             .Select(g => new TopProductoDto
             {
